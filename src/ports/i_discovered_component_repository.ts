@@ -4,4 +4,5 @@ import { DiscoveredComponent } from "../domain/discovered_component";
 export interface IDiscoveredComponentRepository {
   saveAll(components: DiscoveredComponent[]): Promise<void>;
   findByTestPlanId(testPlanId: string): Promise<DiscoveredComponent[]>;
+  update(component: DiscoveredComponent): Promise<DiscoveredComponent>;
 }

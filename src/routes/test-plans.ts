@@ -4,8 +4,8 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { TestPlanService, BoomiServiceFactory } from '../application/test_plan_service';
 import { TestPlanRepository } from '../infrastructure/repositories/test_plan_repository';
 import { DiscoveredComponentRepository } from '../infrastructure/repositories/discovered_component_repository';
-import { ComponentTestMappingRepository } from '../infrastructure/repositories/component_test_mapping_repository'; // Added import
-import { BoomiService } from '../infrastructure/boomi/boomi_service'; // Added import
+import { ComponentTestMappingRepository } from '../infrastructure/repositories/component_test_mapping_repository';
+import { BoomiService } from '../infrastructure/boomi/boomi_service';
 import { BadRequestError, NotFoundError } from '../utils/app_error';
 
 const router = Router();
@@ -15,23 +15,23 @@ const discoveredComponentRepository = new DiscoveredComponentRepository();
 const componentTestMappingRepository = new ComponentTestMappingRepository();
 
 const boomiServiceFactory: BoomiServiceFactory = (credentials) => {
-  return new BoomiService(credentials);
+    return new BoomiService(credentials);
 };
 
 const testPlanService = new TestPlanService(
-  testPlanRepository,
-  discoveredComponentRepository,
-  componentTestMappingRepository,
-  boomiServiceFactory
+    testPlanRepository,
+    discoveredComponentRepository,
+    componentTestMappingRepository,
+    boomiServiceFactory
 );
 
 // ----------------------------------------------------
 
 
-const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) => 
-  (req: Request, res: Response, next: NextFunction) => {
-    return Promise.resolve(fn(req, res, next)).catch(next);
-};
+const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) =>
+    (req: Request, res: Response, next: NextFunction) => {
+        return Promise.resolve(fn(req, res, next)).catch(next);
+    };
 
 /**
  * @swagger
@@ -78,15 +78,15 @@ const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => P
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.post('/', asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-  const { rootComponentId, boomiCredentials } = req.body;
-  if (!rootComponentId || !boomiCredentials) {
-    throw new BadRequestError('rootComponentId and boomiCredentials are required');
-  }
-  const testPlan = await testPlanService.initiateDiscovery(rootComponentId, boomiCredentials);
-  res.status(202).json({
-    metadata: { code: 202, message: 'Accepted' },
-    data: testPlan,
-  });
+    const { rootComponentId, boomiCredentials } = req.body;
+    if (!rootComponentId || !boomiCredentials) {
+        throw new BadRequestError('rootComponentId and boomiCredentials are required');
+    }
+    const testPlan = await testPlanService.initiateDiscovery(rootComponentId, boomiCredentials);
+    res.status(202).json({
+        metadata: { code: 202, message: 'Accepted' },
+        data: testPlan,
+    });
 }));
 
 /**
@@ -129,21 +129,21 @@ router.post('/', asyncHandler(async (req: Request, res: Response, next: NextFunc
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get('/:planId', asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-  const { planId } = req.params;
-  const testPlan = await testPlanRepository.findById(planId);
-  if (!testPlan) {
-    throw new NotFoundError('Test plan not found');
-  }
+    const { planId } = req.params;
+    const testPlan = await testPlanRepository.findById(planId);
+    if (!testPlan) {
+        throw new NotFoundError('Test plan not found');
+    }
 
-  const discoveredComponents = await discoveredComponentRepository.findByTestPlanId(planId);
+    const discoveredComponents = await discoveredComponentRepository.findByTestPlanId(planId);
 
-  res.status(200).json({
-    metadata: { code: 200, message: 'OK' },
-    data: {
-      ...testPlan,
-      discoveredComponents,
-    },
-  });
+    res.status(200).json({
+        metadata: { code: 200, message: 'OK' },
+        data: {
+            ...testPlan,
+            discoveredComponents,
+        },
+    });
 }));
 
 /**
@@ -175,12 +175,22 @@ router.get('/:planId', asyncHandler(async (req: Request, res: Response, next: Ne
  *       '202':
  *         description: Accepted. The test execution has been initiated.
  */
-router.post('/:planId/execute', (req, res) => {
-  // TODO: Implement execution logic
-  res.status(202).json({
-    metadata: { code: 202, message: 'Execution initiated' },
-  });
-});
+router.post('/:planId/execute', asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    const { planId } = req.params;
+    const { testsToRun, boomiCredentials, atomId } = req.body;
+
+    if (!testsToRun || !Array.isArray(testsToRun) || !boomiCredentials || !atomId) {
+        throw new BadRequestError('testsToRun must be an array of component IDs, boomiCredentials and atomId must be provided.');
+    }
+
+    testPlanService.executeTests(planId, testsToRun, boomiCredentials, atomId).catch(err => {
+        console.error(`[Execution Error] for plan ${planId}:`, err);
+    });
+
+    res.status(202).json({
+        metadata: { code: 202, message: 'Execution initiated' },
+    });
+}));
 
 export default router;
 

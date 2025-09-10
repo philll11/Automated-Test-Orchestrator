@@ -3,6 +3,7 @@
 import { TestPlanService, BoomiServiceFactory } from './test_plan_service';
 import { ITestPlanRepository } from '../ports/i_test_plan_repository';
 import { IDiscoveredComponentRepository } from '../ports/i_discovered_component_repository';
+import { DiscoveredComponent } from '../domain/discovered_component';
 import { IComponentTestMappingRepository } from '../ports/i_component_test_mapping_repository';
 import { IBoomiService, BoomiCredentials } from '../ports/i_boomi_service';
 import { TestPlan } from '../domain/test_plan';
@@ -17,6 +18,7 @@ const mockTestPlanRepo: jest.Mocked<ITestPlanRepository> = {
 const mockDiscoveredComponentRepo: jest.Mocked<IDiscoveredComponentRepository> = {
     saveAll: jest.fn(),
     findByTestPlanId: jest.fn(),
+    update: jest.fn(),
 };
 
 const mockComponentTestMappingRepo: jest.Mocked<IComponentTestMappingRepository> = {
@@ -26,6 +28,7 @@ const mockComponentTestMappingRepo: jest.Mocked<IComponentTestMappingRepository>
 
 const mockBoomiService: jest.Mocked<IBoomiService> = {
     getComponentDependencies: jest.fn(),
+    executeTestProcess: jest.fn(),
 };
 
 // Mock the Boomi Service Factory
@@ -55,7 +58,7 @@ describe('TestPlanService', () => {
         );
 
     });
-    
+
     afterEach(() => {
         consoleErrorSpy.mockRestore();
     });
@@ -177,6 +180,137 @@ describe('TestPlanService', () => {
                 id: testPlan.id,
                 status: 'FAILED',
             }));
+        });
+    });
+
+    describe('executeTests', () => {
+        const dummyAtomId = 'test-atom-123';
+        const planId = 'plan-to-execute';
+        const createReadyTestPlan = (): TestPlan => ({
+            id: planId,
+            rootComponentId: 'root-123',
+            status: 'AWAITING_SELECTION',
+            createdAt: new Date(),
+            updatedAt: new Date()
+        });
+
+        const createDiscoveredComponents = () => [
+            { id: 'dc-1', testPlanId: planId, componentId: 'comp-A', mappedTestId: 'test-A' },
+            { id: 'dc-2', testPlanId: planId, componentId: 'comp-B', mappedTestId: 'test-B' },
+            { id: 'dc-3', testPlanId: planId, componentId: 'comp-C', mappedTestId: undefined },
+            { id: 'dc-4', testPlanId: planId, componentId: 'comp-D', mappedTestId: 'test-D' },
+        ];
+
+        it('should update statuses correctly, execute all selected tests, and mark the plan as COMPLETED', async () => {
+            // --- Arrange ---
+            mockTestPlanRepo.findById.mockResolvedValue(createReadyTestPlan());
+            mockDiscoveredComponentRepo.findByTestPlanId.mockResolvedValue(createDiscoveredComponents());
+
+            const testsToRun = ['test-A', 'test-B'];
+
+            // Mock the Boomi service to return success for all calls
+            mockBoomiService.executeTestProcess.mockResolvedValue({
+                status: 'SUCCESS',
+                message: 'All good!',
+            });
+
+            // --- Act ---
+            await service.executeTests(planId, testsToRun, dummyCredentials, dummyAtomId);
+
+            // --- Assert ---
+
+            // 1. Verify the plan status was updated to EXECUTING and then to COMPLETED
+            expect(mockTestPlanRepo.update).toHaveBeenCalledTimes(2);
+            // Check the FIRST call was to set status to EXECUTING
+            expect(mockTestPlanRepo.update.mock.calls[0][0]).toEqual(expect.objectContaining({ status: 'EXECUTING' }));
+            // Check the SECOND call was to set status to COMPLETED
+            expect(mockTestPlanRepo.update.mock.calls[1][0]).toEqual(expect.objectContaining({ status: 'COMPLETED' }));
+
+            // 2. Verify the Boomi service was called for each selected test
+            expect(mockBoomiService.executeTestProcess).toHaveBeenCalledTimes(2);
+            expect(mockBoomiService.executeTestProcess).toHaveBeenCalledWith('test-A', { atomId: dummyAtomId });
+            expect(mockBoomiService.executeTestProcess).toHaveBeenCalledWith('test-B', { atomId: dummyAtomId });
+
+            // 3. Verify the individual components were updated (RUNNING, then SUCCESS)
+            // We expect 2 tests to run, each updated twice.
+            expect(mockDiscoveredComponentRepo.update).toHaveBeenCalledTimes(4);
+            // Find the specific calls for 'test-A'
+            const callsForTestA = mockDiscoveredComponentRepo.update.mock.calls.filter(call => call[0].mappedTestId === 'test-A');
+            expect(callsForTestA.length).toBe(2); // Should be updated twice
+
+            // Verify the first call for 'test-A' was to set status to RUNNING
+            expect(callsForTestA[0][0]).toEqual(expect.objectContaining({ executionStatus: 'RUNNING' }));
+
+            // Verify the second call for 'test-A' was to set status to SUCCESS
+            expect(callsForTestA[1][0]).toEqual(expect.objectContaining({ executionStatus: 'SUCCESS' }));
+
+            // You could add similar checks for 'test-B' for completeness
+            const callsForTestB = mockDiscoveredComponentRepo.update.mock.calls.filter(call => call[0].mappedTestId === 'test-B');
+            expect(callsForTestB.length).toBe(2);
+        });
+
+        it('should mark plan as COMPLETED even if some tests fail', async () => {
+            // --- Arrange ---
+            mockTestPlanRepo.findById.mockResolvedValue(createReadyTestPlan());
+            mockDiscoveredComponentRepo.findByTestPlanId.mockResolvedValue(createDiscoveredComponents());
+
+            const testsToRun = ['test-A', 'test-D'];
+
+            // Mock the Boomi service to fail one of the two tests
+            mockBoomiService.executeTestProcess
+                .mockResolvedValueOnce({ status: 'SUCCESS', message: 'Test A passed' })
+                .mockResolvedValueOnce({ status: 'FAILURE', message: 'Test D failed' });
+
+            // --- Act ---
+            await service.executeTests(planId, testsToRun, dummyCredentials, dummyAtomId);
+
+            // --- Assert ---
+
+            // 1. Still expect the final status to be COMPLETED
+            expect(mockTestPlanRepo.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'COMPLETED' }));
+
+            // 2. Verify the failing component's status was correctly recorded
+            expect(mockDiscoveredComponentRepo.update).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    mappedTestId: 'test-D',
+                    executionStatus: 'FAILURE',
+                    executionLog: 'Test D failed',
+                })
+            );
+        });
+
+        it('should throw an error if the test plan is not in AWAITING_SELECTION state', async () => {
+            // --- Arrange ---
+            const testPlanWrongState: TestPlan = { ...createReadyTestPlan(), status: 'PENDING' };
+            mockTestPlanRepo.findById.mockResolvedValue(testPlanWrongState);
+
+            // --- Act & Assert ---
+            // We expect the promise to be rejected with a specific error message
+            await expect(service.executeTests(planId, [], dummyCredentials, dummyAtomId)).rejects.toThrow(
+                'TestPlan is not in AWAITING_SELECTION state. Current state: PENDING'
+            );
+
+            // Verify no external services were called
+            expect(mockBoomiService.executeTestProcess).not.toHaveBeenCalled();
+            expect(mockDiscoveredComponentRepo.update).not.toHaveBeenCalled();
+        });
+
+        it('should do nothing if the testsToRun array is empty', async () => {
+            // --- Arrange ---
+            mockTestPlanRepo.findById.mockResolvedValue(createReadyTestPlan());
+            mockDiscoveredComponentRepo.findByTestPlanId.mockResolvedValue(createDiscoveredComponents());
+
+            // --- Act ---
+            await service.executeTests(planId, [], dummyCredentials, dummyAtomId);
+
+            // --- Assert ---
+
+            // 1. The plan should still be marked as COMPLETED
+            expect(mockTestPlanRepo.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'COMPLETED' }));
+
+            // 2. No tests should have been executed
+            expect(mockBoomiService.executeTestProcess).not.toHaveBeenCalled();
+            expect(mockDiscoveredComponentRepo.update).not.toHaveBeenCalled();
         });
     });
 });

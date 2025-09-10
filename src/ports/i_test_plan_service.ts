@@ -4,4 +4,5 @@ import { BoomiCredentials } from "./i_boomi_service";
 
 export interface ITestPlanService {
   initiateDiscovery(rootComponentId: string, credentials: BoomiCredentials): Promise<TestPlan>;
+  executeTests(planId: string, testsToRun: string[], credentials: BoomiCredentials, atomId: string): Promise<void>;
 }

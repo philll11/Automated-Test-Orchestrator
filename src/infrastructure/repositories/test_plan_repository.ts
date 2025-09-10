@@ -3,6 +3,7 @@ import { ITestPlanRepository } from "../../ports/i_test_plan_repository";
 import { TestPlan } from "../../domain/test_plan";
 import globalPool from "../database";
 import { Pool } from 'pg';
+import { rowToTestPlan } from "../mappers";
 
 export class TestPlanRepository implements ITestPlanRepository {
     private pool: Pool;
@@ -43,14 +44,4 @@ export class TestPlanRepository implements ITestPlanRepository {
 
         return rowToTestPlan(result.rows[0]);
     }
-}
-
-function rowToTestPlan(row: any): TestPlan {
-    return {
-        id: row.id,
-        rootComponentId: row.root_component_id,
-        status: row.status,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-    };
 }

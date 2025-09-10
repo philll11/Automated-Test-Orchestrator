@@ -1,6 +1,6 @@
 import nock from 'nock';
 import { BoomiService } from './boomi_service';
-import { BoomiCredentials } from '../../ports/i_boomi_service';
+import { BoomiCredentials, TestExecutionOptions } from '../../ports/i_boomi_service';
 
 // Define a scope for our mock API server. This must match the base URL our service creates.
 const BOOMI_API_BASE = 'https://api.boomi.com';
@@ -12,6 +12,8 @@ describe('BoomiService Integration Tests', () => {
         password_or_token: 'testpass',
     };
     const baseApiUrl = `/api/rest/v1/${dummyCredentials.accountId}`;
+
+    const executionOptions: TestExecutionOptions = { atomId: 'test-atom-id-123' };
 
     let consoleWarnSpy: jest.SpyInstance;
 
@@ -149,4 +151,85 @@ describe('BoomiService Integration Tests', () => {
 
         expect(nock.isDone()).toBe(true);
     });
+
+    describe('executeTestProcess', () => {
+
+        it('should poll until a successful completion', async () => {
+            const componentId = 'comp-to-succeed';
+            const requestId = 'execution-success-123';
+            const recordUrl = 'https://platform.boomi.com/log/success-123';
+
+            nock(BOOMI_API_BASE)
+                .post(`${baseApiUrl}/ExecutionRequest`)
+                .reply(200, {
+                    '@type': 'ExecutionRequest',
+                    requestId,
+                    recordUrl
+                });
+
+            nock(BOOMI_API_BASE)
+                .get(`${baseApiUrl}/ExecutionRecord/async/${requestId}`)
+                .times(2) // The first two calls
+                .reply(200, { '@type': 'AsyncOperationResult', responseStatusCode: 202 });
+
+            nock(BOOMI_API_BASE)
+                .get(`${baseApiUrl}/ExecutionRecord/async/${requestId}`)
+                .reply(200, { // The final call
+                    '@type': 'AsyncOperationResult',
+                    responseStatusCode: 200,
+                    result: [{ '@type': 'ExecutionRecord', status: 'COMPLETE' }]
+                });
+
+            const service = new BoomiService(dummyCredentials);
+            const result = await service.executeTestProcess(componentId, executionOptions);
+
+            expect(result.status).toBe('SUCCESS');
+            expect(result.executionLogUrl).toBe(recordUrl);
+            expect(nock.isDone()).toBe(true); // Verifies all 4 mock calls were made
+        });
+
+        it('should poll until an ERROR status is returned', async () => {
+            const componentId = 'comp-to-fail';
+            const requestId = 'execution-fail-456';
+
+            nock(BOOMI_API_BASE).post(`${baseApiUrl}/ExecutionRequest`).reply(200, { requestId });
+
+            nock(BOOMI_API_BASE).get(`${baseApiUrl}/ExecutionRecord/async/${requestId}`).reply(200, { responseStatusCode: 202 });
+            nock(BOOMI_API_BASE).get(`${baseApiUrl}/ExecutionRecord/async/${requestId}`).reply(200, {
+                responseStatusCode: 200,
+                result: [{ status: 'ERROR', message: 'Component failed spectacularly.' }]
+            });
+
+            const service = new BoomiService(dummyCredentials);
+            const result = await service.executeTestProcess(componentId, executionOptions);
+
+            expect(result.status).toBe('FAILURE');
+            expect(result.message).toContain('Component failed spectacularly.');
+            expect(nock.isDone()).toBe(true);
+        });
+
+        it('should return a failure if polling times out', async () => {
+            const componentId = 'comp-to-timeout';
+            const requestId = 'execution-timeout-789';
+
+            nock(BOOMI_API_BASE).post(`${baseApiUrl}/ExecutionRequest`).reply(200, { requestId });
+
+            nock(BOOMI_API_BASE)
+                .get(`${baseApiUrl}/ExecutionRecord/async/${requestId}`)
+                .times(10) // Must match maxPolls when BoomiService is instantiated below
+                .reply(200, { responseStatusCode: 202 });
+
+            const service = new BoomiService(dummyCredentials, {
+                pollInterval: 1,  // Speed up polling for the test
+                maxPolls: 10      // Only try 10 times
+            });
+
+            const result = await service.executeTestProcess(componentId, executionOptions);
+
+            expect(result.status).toBe('FAILURE');
+            expect(result.message).toBe('Execution timed out while polling for a result.');
+            expect(nock.isDone()).toBe(true);
+        });
+    });
+
 });
