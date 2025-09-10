@@ -44,9 +44,16 @@ export class TestPlanService implements ITestPlanService {
 
         // Execute asynchronously and intentionally don't await it
         this.discoverAndSaveAllDependencies(rootComponentId, savedTestPlan.id, credentials)
-            .catch(error => {
-                console.error(`[TestPlanService] Unhandled error during discovery for plan ${savedTestPlan.id}:`, error);
-                // Here you might want to update the test plan to a 'FAILED' state
+            .catch(async error => {
+               console.error(`[TestPlanService] Discovery failed for plan ${savedTestPlan.id}. Updating status to FAILED.`, error);
+                
+                // We MUST update the plan in the database to reflect the failure.
+                const failedPlan: TestPlan = {
+                    ...savedTestPlan,
+                    status: 'FAILED',
+                    updatedAt: new Date(),
+                };
+                await this.testPlanRepository.update(failedPlan);
             });
 
         return savedTestPlan;
@@ -55,9 +62,7 @@ export class TestPlanService implements ITestPlanService {
     // Making this public for easier testing, but it's an internal process
     public async discoverAndSaveAllDependencies(rootComponentId: string, testPlanId: string, credentials: BoomiCredentials): Promise<void> {
         const testPlan = await this.testPlanRepository.findById(testPlanId);
-        if (!testPlan) {
-            throw new Error(`TestPlan with id ${testPlanId} not found.`);
-        }
+        if (!testPlan) throw new Error(`TestPlan with id ${testPlanId} not found.`);
 
         try {
             const boomiService = this.boomiServiceFactory(credentials);
@@ -90,6 +95,7 @@ export class TestPlanService implements ITestPlanService {
             testPlan.status = 'FAILED';
             testPlan.updatedAt = new Date();
             await this.testPlanRepository.update(testPlan);
+            throw error;
         }
     }
 

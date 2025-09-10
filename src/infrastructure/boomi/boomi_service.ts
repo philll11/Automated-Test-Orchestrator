@@ -2,6 +2,7 @@
 
 import axios, { AxiosInstance } from 'axios';
 import { IBoomiService, BoomiCredentials, TestExecutionResult, TestExecutionOptions } from '../../ports/i_boomi_service.js';
+import { AuthenticationError } from '../../utils/app_error.js';
 
 // --- Type Definitions for Boomi API Responses ---
 interface ComponentMetadataResponse {
@@ -41,7 +42,7 @@ export class BoomiService implements IBoomiService {
                 password: credentials.password_or_token,
             },
         });
-        this.pollInterval = options.pollInterval ?? 1000; 
+        this.pollInterval = options.pollInterval ?? 1000;
         this.maxPolls = options.maxPolls ?? 60;
     }
 
@@ -50,13 +51,15 @@ export class BoomiService implements IBoomiService {
             const response = await this.apiClient.get<ComponentMetadataResponse>(`/ComponentMetadata/${componentId}`);
             return response.data.version;
         } catch (error) {
-            if (axios.isAxiosError(error)) {
-                if (error.response && error.response.status === 400) {
+            if (axios.isAxiosError(error) && error.response) {
+                if ([401, 403, 404].includes(error.response.status)) {
+                    throw new AuthenticationError('Boomi API authentication failed. Please check your credentials.');
+                }
+                if (error.response.status === 400) { // Boomi incorrectly returns 400 for not found
                     console.warn(`Component with ID ${componentId} not found or invalid. It will be treated as having no dependencies.`);
-                    return null; // Gracefully handle "not found" as a non-critical error
+                    return null;
                 }
             }
-            // For all other errors (network issues, 500s, etc.), log and re-throw
             console.error(`An unexpected error occurred while fetching version for component ${componentId}:`, error);
             throw error;
         }

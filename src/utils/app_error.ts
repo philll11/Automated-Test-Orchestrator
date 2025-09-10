@@ -20,3 +20,9 @@ export class NotFoundError extends AppError {
     super(message, 404);
   }
 }
+
+export class AuthenticationError extends AppError {
+  constructor(message: string = 'Authentication Failed') {
+    super(message, 401);
+  }
+}
