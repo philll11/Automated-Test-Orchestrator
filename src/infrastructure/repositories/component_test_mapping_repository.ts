@@ -1,14 +1,15 @@
 // src/infrastructure/repositories/component_test_mapping_repository.ts
-import { IComponentTestMappingRepository } from "../../ports/i_component_test_mapping_repository";
-import { ComponentTestMapping } from "../../domain/component_test_mapping";
-import globalPool from "../database";
-import { Pool } from 'pg';
-import { rowToComponentTestMapping } from "../mappers";
+
+import pg from 'pg';
+import { IComponentTestMappingRepository } from "../../ports/i_component_test_mapping_repository.js";
+import { ComponentTestMapping } from "../../domain/component_test_mapping.js";
+import globalPool from "../database.js";
+import { rowToComponentTestMapping } from "../mappers.js";
 
 export class ComponentTestMappingRepository implements IComponentTestMappingRepository {
-    private pool: Pool;
+    private pool: pg.Pool;
 
-    constructor(poolInstance: Pool = globalPool) {
+    constructor(poolInstance: pg.Pool = globalPool) {
         this.pool = poolInstance;
     }
     async findTestMapping(mainComponentId: string): Promise<ComponentTestMapping | null> {

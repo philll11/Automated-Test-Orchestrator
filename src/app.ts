@@ -2,9 +2,9 @@
 
 import express from 'express';
 import swaggerUi from 'swagger-ui-express';
-import swaggerSpec from './swagger';
-import testPlanRoutes from './routes/test-plans';
-import { errorHandler } from './middleware/error_handler';
+import swaggerSpec from './swagger.js';
+import testPlanRoutes from './routes/test-plans.js';
+import { errorHandler } from './middleware/error_handler.js';
 
 // Create and configure the Express app
 const app = express();

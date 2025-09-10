@@ -1,8 +1,8 @@
 // src/infrastructure/mappers.ts
 
-import { TestPlan } from '../domain/test_plan';
-import { DiscoveredComponent } from '../domain/discovered_component';
-import { ComponentTestMapping } from '../domain/component_test_mapping';
+import { TestPlan } from '../domain/test_plan.js';
+import { DiscoveredComponent } from '../domain/discovered_component.js';
+import { ComponentTestMapping } from '../domain/component_test_mapping.js';
 
 /**
  * Maps a raw database row from the 'test_plans' table to a TestPlan domain object.

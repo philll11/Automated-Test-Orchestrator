@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node dist/index.js",
     "build": "tsc",
-    "dev": "ts-node src/index.ts",
+    "dev": "node --loader ts-node/esm src/index.ts",
     "test": "jest --verbose",
     "test:e2e": "jest --testMatch=\"**/*.e2e.test.ts\" --verbose",
     "test:e2e:discover": "jest --testMatch=\"**/discovery.e2e.test.ts\" --verbose",
@@ -15,7 +15,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "devDependencies": {
     "@types/jest": "29.5.12",
     "@types/node": "20.14.9",

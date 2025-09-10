@@ -1,14 +1,16 @@
 // src/infrastructure/repositories/test_plan_repository.ts
-import { ITestPlanRepository } from "../../ports/i_test_plan_repository";
-import { TestPlan } from "../../domain/test_plan";
-import globalPool from "../database";
-import { Pool } from 'pg';
-import { rowToTestPlan } from "../mappers";
+
+import pg from 'pg';
+import { ITestPlanRepository } from "../../ports/i_test_plan_repository.js";
+import { TestPlan } from "../../domain/test_plan.js";
+import globalPool from "../database.js";
+import { rowToTestPlan } from "../mappers.js";
+
 
 export class TestPlanRepository implements ITestPlanRepository {
-    private pool: Pool;
+    private pool: pg.Pool;
 
-    constructor(poolInstance: Pool = globalPool) {
+    constructor(poolInstance: pg.Pool = globalPool) {
         this.pool = poolInstance;
     }
 

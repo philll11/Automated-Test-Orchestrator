@@ -1,12 +1,12 @@
 // src/routes/test-plans.ts
 
 import { Router, Request, Response, NextFunction } from 'express';
-import { TestPlanService, BoomiServiceFactory } from '../application/test_plan_service';
-import { TestPlanRepository } from '../infrastructure/repositories/test_plan_repository';
-import { DiscoveredComponentRepository } from '../infrastructure/repositories/discovered_component_repository';
-import { ComponentTestMappingRepository } from '../infrastructure/repositories/component_test_mapping_repository';
-import { BoomiService } from '../infrastructure/boomi/boomi_service';
-import { BadRequestError, NotFoundError } from '../utils/app_error';
+import { TestPlanService, BoomiServiceFactory } from '../application/test_plan_service.js';
+import { TestPlanRepository } from '../infrastructure/repositories/test_plan_repository.js';
+import { DiscoveredComponentRepository } from '../infrastructure/repositories/discovered_component_repository.js';
+import { ComponentTestMappingRepository } from '../infrastructure/repositories/component_test_mapping_repository.js';
+import { BoomiService } from '../infrastructure/boomi/boomi_service.js';
+import { BadRequestError, NotFoundError } from '../utils/app_error.js';
 
 const router = Router();
 

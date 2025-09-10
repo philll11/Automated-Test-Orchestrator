@@ -1,13 +1,13 @@
 // src/application/test_plan_service.ts
 
-import { ITestPlanService } from "../ports/i_test_plan_service";
-import { TestPlan } from "../domain/test_plan";
 import { v4 as uuidv4 } from 'uuid';
-import { ITestPlanRepository } from "../ports/i_test_plan_repository";
-import { BoomiCredentials, IBoomiService } from "../ports/i_boomi_service";
-import { DiscoveredComponent } from "../domain/discovered_component";
-import { IDiscoveredComponentRepository } from "../ports/i_discovered_component_repository";
-import { IComponentTestMappingRepository } from "../ports/i_component_test_mapping_repository";
+import { ITestPlanService } from "../ports/i_test_plan_service.js";
+import { TestPlan } from "../domain/test_plan.js";
+import { ITestPlanRepository } from "../ports/i_test_plan_repository.js";
+import { BoomiCredentials, IBoomiService } from "../ports/i_boomi_service.js";
+import { DiscoveredComponent } from "../domain/discovered_component.js";
+import { IDiscoveredComponentRepository } from "../ports/i_discovered_component_repository.js";
+import { IComponentTestMappingRepository } from "../ports/i_component_test_mapping_repository.js";
 
 // This is a "factory" to create a BoomiService. In a real app, this might be more complex.
 // We pass this factory into the service so we can control BoomiService creation.

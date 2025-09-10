@@ -1,7 +1,7 @@
 // src/infrastructure/boomi/boomi_service.ts
 
 import axios, { AxiosInstance } from 'axios';
-import { IBoomiService, BoomiCredentials, TestExecutionResult, TestExecutionOptions } from '../../ports/i_boomi_service';
+import { IBoomiService, BoomiCredentials, TestExecutionResult, TestExecutionOptions } from '../../ports/i_boomi_service.js';
 
 // --- Type Definitions for Boomi API Responses ---
 interface ComponentMetadataResponse {

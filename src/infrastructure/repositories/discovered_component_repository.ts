@@ -1,15 +1,15 @@
 // src/infrastructure/repositories/discovered_component_repository.ts
 
-import { IDiscoveredComponentRepository } from "../../ports/i_discovered_component_repository";
-import { DiscoveredComponent } from "../../domain/discovered_component";
-import globalPool from "../database";
-import { Pool } from 'pg';
-import { rowToDiscoveredComponent } from "../mappers";
+import pg from 'pg';
+import { IDiscoveredComponentRepository } from "../../ports/i_discovered_component_repository.js";
+import { DiscoveredComponent } from "../../domain/discovered_component.js";
+import globalPool from "../database.js";
+import { rowToDiscoveredComponent } from "../mappers.js";
 
 export class DiscoveredComponentRepository implements IDiscoveredComponentRepository {
-    private pool: Pool;
+    private pool: pg.Pool;
 
-    constructor(poolInstance: Pool = globalPool) {
+    constructor(poolInstance: pg.Pool = globalPool) {
         this.pool = poolInstance;
     }
 
