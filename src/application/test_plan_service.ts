@@ -45,8 +45,8 @@ export class TestPlanService implements ITestPlanService {
         // Execute asynchronously and intentionally don't await it
         this.discoverAndSaveAllDependencies(rootComponentId, savedTestPlan.id, credentials)
             .catch(async error => {
-               console.error(`[TestPlanService] Discovery failed for plan ${savedTestPlan.id}. Updating status to FAILED.`, error);
-                
+                console.error(`[TestPlanService] Discovery failed for plan ${savedTestPlan.id}. Updating status to FAILED.`, error);
+
                 // We MUST update the plan in the database to reflect the failure.
                 const failedPlan: TestPlan = {
                     ...savedTestPlan,
@@ -59,29 +59,27 @@ export class TestPlanService implements ITestPlanService {
         return savedTestPlan;
     }
 
-    // Making this public for easier testing, but it's an internal process
     public async discoverAndSaveAllDependencies(rootComponentId: string, testPlanId: string, credentials: BoomiCredentials): Promise<void> {
         const testPlan = await this.testPlanRepository.findById(testPlanId);
         if (!testPlan) throw new Error(`TestPlan with id ${testPlanId} not found.`);
 
         try {
             const boomiService = this.boomiServiceFactory(credentials);
-            const allDependencies = new Set<string>();
-            await this.findAllDependenciesRecursive(rootComponentId, boomiService, allDependencies);
 
-            // Add the root component itself to the list of discovered components
-            allDependencies.add(rootComponentId);
+            const discoveredComponentsMap = new Map<string, string>();
+            await this.findAllDependenciesRecursive(rootComponentId, boomiService, discoveredComponentsMap);
 
-            const componentIds = Array.from(allDependencies);
+            const componentIds = Array.from(discoveredComponentsMap.keys());
 
-            // Find all existing test mappings for the discovered components in one go
             const testMappings = await this.componentTestMappingRepository.findAllTestMappings(componentIds);
 
             const discoveredComponents: DiscoveredComponent[] = componentIds.map(componentId => ({
                 id: uuidv4(),
                 testPlanId,
                 componentId,
-                mappedTestId: testMappings.get(componentId) || undefined, // Set the mapped test ID if it exists
+                componentName: discoveredComponentsMap.get(componentId),
+                mappedTestId: testMappings.get(componentId),
+                executionStatus: 'PENDING',
             }));
 
             await this.discoveredComponentRepository.saveAll(discoveredComponents);
@@ -99,17 +97,24 @@ export class TestPlanService implements ITestPlanService {
         }
     }
 
-    private async findAllDependenciesRecursive(componentId: string, boomiService: IBoomiService, visited: Set<string>): Promise<void> {
-        if (visited.has(componentId)) {
-            return; // Avoid redundant calls and circular dependencies
+    private async findAllDependenciesRecursive(componentId: string, boomiService: IBoomiService, discoveredComponentsMap: Map<string, string>): Promise<void> {
+
+        if (discoveredComponentsMap.has(componentId)) return; // Already processed this component
+
+        const componentInfo = await boomiService.getComponentInfoAndDependencies(componentId);
+
+        // In theory, the only time componentInfo is null is if the root component doesn't exist.
+        // Or if the component was deleted during the discovery process.
+        // Either way, record it and return.
+        if (!componentInfo) {
+            discoveredComponentsMap.set(componentId, 'Component Not Found');
+            return;
         }
-        visited.add(componentId);
 
-        const dependencies = await boomiService.getComponentDependencies(componentId);
+        discoveredComponentsMap.set(componentId, componentInfo.name);
 
-        // Create an array of promises to run dependencies in parallel for performance
-        const discoveryPromises = dependencies.map(depId =>
-            this.findAllDependenciesRecursive(depId, boomiService, visited)
+        const discoveryPromises = componentInfo.dependencyIds.map(depId =>
+            this.findAllDependenciesRecursive(depId, boomiService, discoveredComponentsMap)
         );
 
         await Promise.all(discoveryPromises);
@@ -124,7 +129,6 @@ export class TestPlanService implements ITestPlanService {
             throw new Error(`TestPlan is not in AWAITING_SELECTION state. Current state: ${testPlan.status}`);
         }
 
-        // 1. Update the master plan status to EXECUTING
         await this.testPlanRepository.update({
             ...testPlan,
             status: 'EXECUTING'
@@ -133,7 +137,7 @@ export class TestPlanService implements ITestPlanService {
         const discoveredComponents = await this.discoveredComponentRepository.findByTestPlanId(planId);
         const componentsToTest = discoveredComponents.filter(c => testsToRun.includes(c.mappedTestId || ''));
 
-        // 2. Execute all tests in parallel and wait for all to complete
+        // Execute all tests in parallel and wait for all to complete
         const executionPromises = componentsToTest.map(async (component) => {
             await this.discoveredComponentRepository.update({
                 ...component,
@@ -152,7 +156,7 @@ export class TestPlanService implements ITestPlanService {
         // Promise.allSettled ensures we wait for all tests, even if some fail
         await Promise.allSettled(executionPromises);
 
-        // 3. Update the master plan status to COMPLETED
+        // Update the master plan status to COMPLETED
         await this.testPlanRepository.update({
             ...testPlan,
             status: 'COMPLETED',

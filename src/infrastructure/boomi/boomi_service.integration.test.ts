@@ -18,28 +18,24 @@ describe('BoomiService Integration Tests', () => {
     let consoleWarnSpy: jest.SpyInstance;
 
     beforeEach(() => {
-        // Ensure no nock interceptors are left over from previous tests
         nock.cleanAll();
-        // Spy on console.warn to check for specific log messages without polluting the output
         consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => { });
     });
 
     afterEach(() => {
-        // Restore the original console.warn
         consoleWarnSpy.mockRestore();
     });
 
-    it('should fetch component dependencies correctly on a happy path', async () => {
+    it('should fetch component info and dependencies correctly on a happy path', async () => {
         // --- Arrange: Setup the mock API responses ---
         const rootComponentId = 'comp-root-A';
         const componentVersion = 17;
 
-        // 1. Mock the GET /ComponentMetadata endpoint
+        // Mock the GET /ComponentMetadata endpoint to include the component name
         nock(BOOMI_API_BASE)
             .get(`${baseApiUrl}/ComponentMetadata/${rootComponentId}`)
-            .reply(200, { version: componentVersion });
+            .reply(200, { name: 'Root Component A', version: componentVersion });
 
-        // 2. Mock the POST /ComponentReference/query endpoint
         const expectedPostBody = {
             QueryFilter: {
                 expression: {
@@ -68,86 +64,82 @@ describe('BoomiService Integration Tests', () => {
             .post(`${baseApiUrl}/ComponentReference/query`, expectedPostBody)
             .reply(200, mockQueryResponse);
 
-        // --- Act: Call the service method ---
+        // --- Act ---
         const service = new BoomiService(dummyCredentials);
-        const dependencies = await service.getComponentDependencies(rootComponentId);
+        const result = await service.getComponentInfoAndDependencies(rootComponentId);
 
-        // --- Assert: Verify the results ---
-        expect(dependencies).toEqual(['dep-1', 'dep-2']);
+        // Assert against the new return structure
+        expect(result).toEqual({
+            name: 'Root Component A',
+            dependencyIds: ['dep-1', 'dep-2']
+        });
 
-        // Verify that all mocked endpoints were called
         expect(nock.isDone()).toBe(true);
     });
 
-    it('should return an empty array if the component is not found (400 error)', async () => {
+    it('should return null if the component is not found (400 error)', async () => {
         // --- Arrange ---
         const invalidComponentId = 'comp-invalid-B';
-
-        // Mock the GET /ComponentMetadata endpoint to return a 400 error
         nock(BOOMI_API_BASE)
             .get(`${baseApiUrl}/ComponentMetadata/${invalidComponentId}`)
             .reply(400, { message: 'Component not found' });
 
         // --- Act ---
         const service = new BoomiService(dummyCredentials);
-        const dependencies = await service.getComponentDependencies(invalidComponentId);
+        const result = await service.getComponentInfoAndDependencies(invalidComponentId);
 
-        // --- Assert ---
-        expect(dependencies).toEqual([]);
+        // Assert that the result is null
+        expect(result).toBeNull();
 
-        // Check that the warning was logged
         expect(consoleWarnSpy).toHaveBeenCalledWith(
             `Component with ID ${invalidComponentId} not found or invalid. It will be treated as having no dependencies.`
         );
-
-        // Verify that the POST /query endpoint was NEVER called
         expect(nock.isDone()).toBe(true);
     });
 
-    it('should return an empty array if a valid component has no dependencies', async () => {
+    it('should return the name and an empty dependency array if a valid component has no dependencies', async () => {
         // --- Arrange ---
         const rootComponentId = 'comp-root-C';
         const componentVersion = 2;
 
-        // 1. Mock the GET /ComponentMetadata endpoint
+        // Mock the GET /ComponentMetadata endpoint to include the component name
         nock(BOOMI_API_BASE)
             .get(`${baseApiUrl}/ComponentMetadata/${rootComponentId}`)
-            .reply(200, { version: componentVersion });
+            .reply(200, { name: 'Root Component C', version: componentVersion });
 
-        // 2. Mock the POST /ComponentReference/query to return 0 results
         const mockQueryResponse = {
             numberOfResults: 0,
             result: [],
         };
 
         nock(BOOMI_API_BASE)
-            .post(`${baseApiUrl}/ComponentReference/query`) // Body can be less specific here
+            .post(`${baseApiUrl}/ComponentReference/query`)
             .reply(200, mockQueryResponse);
 
         // --- Act ---
         const service = new BoomiService(dummyCredentials);
-        const dependencies = await service.getComponentDependencies(rootComponentId);
+        const result = await service.getComponentInfoAndDependencies(rootComponentId);
 
-        // --- Assert ---
-        expect(dependencies).toEqual([]);
+        // Assert against the new return structure with an empty array
+        expect(result).toEqual({
+            name: 'Root Component C',
+            dependencyIds: []
+        });
         expect(nock.isDone()).toBe(true);
     });
 
     it('should correctly set the Authorization header for Basic Auth', async () => {
         const rootComponentId = 'comp-auth-D';
-
-        // Arrange: Mock the API but require the Basic Auth header to be present
         nock(BOOMI_API_BASE, {
             reqheaders: {
-                // axios creates a 'Basic base64(user:pass)' header
                 'authorization': `Basic ${Buffer.from('testuser:testpass').toString('base64')}`
             }
         })
             .get(`${baseApiUrl}/ComponentMetadata/${rootComponentId}`)
-            .reply(400); // We don't care about the response, only that the request was matched
+            .reply(400);
 
         const service = new BoomiService(dummyCredentials);
-        await service.getComponentDependencies(rootComponentId);
+        await service.getComponentInfoAndDependencies(rootComponentId);
 
         expect(nock.isDone()).toBe(true);
     });
@@ -169,12 +161,12 @@ describe('BoomiService Integration Tests', () => {
 
             nock(BOOMI_API_BASE)
                 .get(`${baseApiUrl}/ExecutionRecord/async/${requestId}`)
-                .times(2) // The first two calls
+                .times(2)
                 .reply(200, { '@type': 'AsyncOperationResult', responseStatusCode: 202 });
 
             nock(BOOMI_API_BASE)
                 .get(`${baseApiUrl}/ExecutionRecord/async/${requestId}`)
-                .reply(200, { // The final call
+                .reply(200, {
                     '@type': 'AsyncOperationResult',
                     responseStatusCode: 200,
                     result: [{ '@type': 'ExecutionRecord', status: 'COMPLETE' }]
@@ -185,7 +177,7 @@ describe('BoomiService Integration Tests', () => {
 
             expect(result.status).toBe('SUCCESS');
             expect(result.executionLogUrl).toBe(recordUrl);
-            expect(nock.isDone()).toBe(true); // Verifies all 4 mock calls were made
+            expect(nock.isDone()).toBe(true);
         });
 
         it('should poll until an ERROR status is returned', async () => {
@@ -193,7 +185,6 @@ describe('BoomiService Integration Tests', () => {
             const requestId = 'execution-fail-456';
 
             nock(BOOMI_API_BASE).post(`${baseApiUrl}/ExecutionRequest`).reply(200, { requestId });
-
             nock(BOOMI_API_BASE).get(`${baseApiUrl}/ExecutionRecord/async/${requestId}`).reply(200, { responseStatusCode: 202 });
             nock(BOOMI_API_BASE).get(`${baseApiUrl}/ExecutionRecord/async/${requestId}`).reply(200, {
                 responseStatusCode: 200,
@@ -213,17 +204,15 @@ describe('BoomiService Integration Tests', () => {
             const requestId = 'execution-timeout-789';
 
             nock(BOOMI_API_BASE).post(`${baseApiUrl}/ExecutionRequest`).reply(200, { requestId });
-
             nock(BOOMI_API_BASE)
                 .get(`${baseApiUrl}/ExecutionRecord/async/${requestId}`)
-                .times(10) // Must match maxPolls when BoomiService is instantiated below
+                .times(10)
                 .reply(200, { responseStatusCode: 202 });
 
             const service = new BoomiService(dummyCredentials, {
-                pollInterval: 1,  // Speed up polling for the test
-                maxPolls: 10      // Only try 10 times
+                pollInterval: 1,
+                maxPolls: 10
             });
-
             const result = await service.executeTestProcess(componentId, executionOptions);
 
             expect(result.status).toBe('FAILURE');

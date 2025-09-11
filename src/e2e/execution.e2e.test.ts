@@ -1,17 +1,17 @@
 import request from 'supertest';
 import nock from 'nock';
-import { Pool } from 'pg';
+import pg from 'pg';
 import { v4 as uuidv4 } from 'uuid';
-import app from '../app';
-import globalPool from '../infrastructure/database';
-import { TestPlan } from '../domain/test_plan';
-import { DiscoveredComponent } from '../domain/discovered_component';
+import app from '../app.js';
+import globalPool from '../infrastructure/database.js';
+import { TestPlan } from '../domain/test_plan.js';
+import { DiscoveredComponent } from '../domain/discovered_component.js';
 
 // --- Test Setup ---
 const BOOMI_API_BASE = 'https://api.boomi.com';
 
 describe('Execution End-to-End Test', () => {
-    let testPool: Pool;
+    let testPool: pg.Pool;
     const credentials = {
         accountId: 'test-account-e2e',
         username: 'testuser',
@@ -21,7 +21,7 @@ describe('Execution End-to-End Test', () => {
     const baseApiUrl = `/api/rest/v1/${credentials.accountId}`;
 
     beforeAll(() => {
-        testPool = new Pool({
+        testPool = new pg.Pool({
             user: process.env.DB_USER,
             host: process.env.DB_HOST,
             database: process.env.DB_NAME,
@@ -47,42 +47,49 @@ describe('Execution End-to-End Test', () => {
         const testPlan: TestPlan = {
             id: planId,
             rootComponentId: 'root-e2e-exec',
-            status: 'AWAITING_SELECTION', // The required starting state
+            status: 'AWAITING_SELECTION',
             createdAt: new Date(),
             updatedAt: new Date(),
         };
         await testPool.query(
             `INSERT INTO test_plans (id, root_component_id, status, created_at, updated_at) 
-         VALUES ($1, $2, $3, $4, $5)`,
+             VALUES ($1, $2, $3, $4, $5)`,
             [planId, testPlan.rootComponentId, testPlan.status, testPlan.createdAt, testPlan.updatedAt]
         );
 
+        // Updated DiscoveredComponent objects to match the full domain model
         const componentToTest: DiscoveredComponent = {
             id: uuidv4(),
             testPlanId: planId,
             componentId: 'comp-abc',
-            mappedTestId: 'test-abc-123', // The test we will select to run
+            componentName: 'Component to Test',
+            mappedTestId: 'test-abc-123',
+            executionStatus: 'PENDING', // Set the correct initial state
         };
         const componentToIgnore: DiscoveredComponent = {
             id: uuidv4(),
             testPlanId: planId,
             componentId: 'comp-def',
-            mappedTestId: 'test-def-456', // The test we will NOT select
+            componentName: 'Component to Ignore',
+            mappedTestId: 'test-def-456',
+            executionStatus: 'PENDING', // Set the correct initial state
         };
+
+        // Updated INSERT query to include the new columns
         await testPool.query(
-            `INSERT INTO discovered_components (id, test_plan_id, component_id, mapped_test_id) 
-         VALUES ($1, $2, $3, $4), ($5, $6, $7, $8)`,
-            [componentToTest.id, planId, componentToTest.componentId, componentToTest.mappedTestId,
-            componentToIgnore.id, planId, componentToIgnore.componentId, componentToIgnore.mappedTestId]
+            `INSERT INTO discovered_components (id, test_plan_id, component_id, component_name, mapped_test_id, execution_status) 
+             VALUES ($1, $2, $3, $4, $5, $6), ($7, $8, $9, $10, $11, $12)`,
+            [
+                componentToTest.id, planId, componentToTest.componentId, componentToTest.componentName, componentToTest.mappedTestId, componentToTest.executionStatus,
+                componentToIgnore.id, planId, componentToIgnore.componentId, componentToIgnore.componentName, componentToIgnore.mappedTestId, componentToIgnore.executionStatus
+            ]
         );
 
         // --- Arrange (2): Mock the Boomi API execution sequence ---
         const requestId = 'execution-e2e-success-123';
         const recordUrl = 'https://platform.boomi.com/log/e2e-success-123';
 
-        // Mock the POST to start the execution
         nock(BOOMI_API_BASE).post(`${baseApiUrl}/ExecutionRequest`).reply(200, { requestId, recordUrl });
-        // Mock the GET polling to return success on the first poll
         nock(BOOMI_API_BASE).get(`${baseApiUrl}/ExecutionRecord/async/${requestId}`).reply(200, {
             responseStatusCode: 200,
             result: [{ status: 'COMPLETE' }],
@@ -92,11 +99,11 @@ describe('Execution End-to-End Test', () => {
         const response = await request(app)
             .post(`/api/v1/test-plans/${planId}/execute`)
             .send({
-                testsToRun: [componentToTest.mappedTestId], // Only select the first test
+                testsToRun: [componentToTest.mappedTestId],
                 boomiCredentials: credentials,
                 atomId: atomId,
             })
-            .expect(202); // Assert the HTTP status code is 202 Accepted
+            .expect(202);
 
         expect(response.body.metadata.message).toBe('Execution initiated');
 
@@ -115,10 +122,10 @@ describe('Execution End-to-End Test', () => {
         expect(testedCompResult.rowCount).toBe(1);
         expect(testedCompResult.rows[0].execution_status).toBe('SUCCESS');
 
-        // 3. Check that the IGNORED component was NOT updated
+        // Check that the IGNORED component's status remained PENDING
         const ignoredCompResult = await testPool.query('SELECT execution_status FROM discovered_components WHERE id = $1', [componentToIgnore.id]);
         expect(ignoredCompResult.rowCount).toBe(1);
-        expect(ignoredCompResult.rows[0].execution_status).toBeNull();
+        expect(ignoredCompResult.rows[0].execution_status).toBe('PENDING');
 
         // 4. Verify that all mocked Boomi API endpoints were called
         expect(nock.isDone()).toBe(true);

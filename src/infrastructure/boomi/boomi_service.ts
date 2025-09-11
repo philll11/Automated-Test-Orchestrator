@@ -1,11 +1,12 @@
 // src/infrastructure/boomi/boomi_service.ts
 
 import axios, { AxiosInstance } from 'axios';
-import { IBoomiService, BoomiCredentials, TestExecutionResult, TestExecutionOptions } from '../../ports/i_boomi_service.js';
+import { IBoomiService, BoomiCredentials, TestExecutionResult, TestExecutionOptions, ComponentInfoAndDependencies } from '../../ports/i_boomi_service.js';
 import { AuthenticationError } from '../../utils/app_error.js';
 
 // --- Type Definitions for Boomi API Responses ---
 interface ComponentMetadataResponse {
+    name: string;
     version: number;
 }
 
@@ -41,15 +42,22 @@ export class BoomiService implements IBoomiService {
                 username: credentials.username,
                 password: credentials.password_or_token,
             },
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
         });
         this.pollInterval = options.pollInterval ?? 1000;
         this.maxPolls = options.maxPolls ?? 60;
     }
 
-    private async getComponentVersion(componentId: string): Promise<number | null> {
+    private async getComponentMetadata(componentId: string): Promise<ComponentMetadataResponse | null> {
         try {
             const response = await this.apiClient.get<ComponentMetadataResponse>(`/ComponentMetadata/${componentId}`);
-            return response.data.version;
+            return {
+                name: response.data.name,
+                version: response.data.version
+            };
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
                 if ([401, 403, 404].includes(error.response.status)) {
@@ -60,14 +68,14 @@ export class BoomiService implements IBoomiService {
                     return null;
                 }
             }
-            console.error(`An unexpected error occurred while fetching version for component ${componentId}:`, error);
+            console.error(`An unexpected error occurred while fetching metadata for component ${componentId}:`, error);
             throw error;
         }
     }
 
-    public async getComponentDependencies(componentId: string): Promise<string[]> {
-        const version = await this.getComponentVersion(componentId);
-        if (version === null) return [];
+    public async getComponentInfoAndDependencies(componentId: string): Promise<ComponentInfoAndDependencies | null> {
+        const metadata = await this.getComponentMetadata(componentId);
+        if (metadata === null) return null; // Component not found, return null
 
         try {
             const response = await this.apiClient.post<ComponentReferenceQueryResponse>('/ComponentReference/query', {
@@ -83,28 +91,33 @@ export class BoomiService implements IBoomiService {
                             {
                                 operator: 'EQUALS',
                                 property: 'parentVersion',
-                                argument: [version],
+                                argument: [metadata.version],
                             },
                         ],
                     },
                 },
             });
 
-            if (response.data.numberOfResults === 0 || !response.data.result) return [];
-
-            return response.data.result.flatMap((resultItem) =>
-                resultItem.references ? resultItem.references.map((ref) => ref.componentId) : []
-            );
+            const dependencyIds = response.data.numberOfResults === 0 || !response.data.result
+                ? []
+                : response.data.result.flatMap((resultItem) =>
+                    resultItem.references ? resultItem.references.map((ref) => ref.componentId) : []
+                );
+            
+            // Return the combined object
+            return {
+                name: metadata.name,
+                dependencyIds: dependencyIds
+            };
 
         } catch (error) {
             console.error(`An unexpected error occurred while fetching dependencies for component ${componentId}:`, error);
-            throw error; // Re-throw to be handled by the calling service (TestPlanService)
+            throw error;
         }
     }
 
     public async executeTestProcess(componentId: string, options: TestExecutionOptions): Promise<TestExecutionResult> {
         try {
-            // 1. Initiate Execution
             const executionRequest = {
                 '@type': 'ExecutionRequest',
                 atomId: options.atomId,
@@ -118,41 +131,44 @@ export class BoomiService implements IBoomiService {
                 throw new Error('Execution initiation failed to return a requestId.');
             }
 
-            // 2. Poll for Result
             let pollCount = 0;
 
             while (pollCount < this.maxPolls) {
                 const pollResponse = await this.apiClient.get(`/ExecutionRecord/async/${requestId}`);
 
                 if (pollResponse.data.responseStatusCode === 200) {
-                    // 3. Interpret Final Result
                     const executionRecord = pollResponse.data.result?.[0];
                     if (!executionRecord) {
                         return { status: 'FAILURE', message: 'Execution completed but no result record was found.' };
                     }
 
-                    if (executionRecord.status === 'COMPLETE') {
+                    const currentStatus = executionRecord.status;
+
+                    // Check for terminal success or failure states
+                    if (currentStatus === 'COMPLETE') {
                         return { status: 'SUCCESS', message: 'Execution completed successfully.', executionLogUrl: recordUrl };
-                    } else if (executionRecord.status === 'ERROR') {
+                    }
+
+                    if (currentStatus === 'ERROR') {
                         return { status: 'FAILURE', message: `Execution failed with message: ${executionRecord.message}`, executionLogUrl: recordUrl };
-                    } else {
-                        // This could happen if the process errors out in an unusual way
-                        return { status: 'FAILURE', message: `Execution finished with unexpected status: ${executionRecord.status}`, executionLogUrl: recordUrl };
                     }
                 }
 
-                // If status is 202 (INPROCESS), wait and poll again
                 pollCount++;
                 await delay(this.pollInterval);
             }
 
-            // If we exit the loop, it's a timeout
             return { status: 'FAILURE', message: 'Execution timed out while polling for a result.' };
 
         } catch (error) {
-            console.error(`Execution failed for component ${componentId}:`, error);
-            const message = axios.isAxiosError(error) ? error.message : 'An unknown error occurred during execution.';
-            return { status: 'FAILURE', message };
+            if (axios.isAxiosError(error) && error.response) {
+                console.error('Boomi API error during test execution:', error.response.data);
+                const message = error.response.data?.message || 'An unknown error occurred during execution.';
+                return { status: 'FAILURE', message: message };
+            } else {
+                console.error('Unexpected error during test execution:', error);
+                return { status: 'FAILURE', message: 'An unknown error occurred during execution.' };
+            }
         }
     }
 }

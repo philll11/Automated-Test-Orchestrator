@@ -16,7 +16,12 @@ export interface TestExecutionResult {
   executionLogUrl?: string;
 }
 
+export interface ComponentInfoAndDependencies {
+  name: string;
+  dependencyIds: string[];
+}
+
 export interface IBoomiService {
-  getComponentDependencies(rootComponentId: string): Promise<string[]>;
+  getComponentInfoAndDependencies(componentId: string): Promise<ComponentInfoAndDependencies | null>;
   executeTestProcess(componentId: string, options: TestExecutionOptions): Promise<TestExecutionResult>;
 }
