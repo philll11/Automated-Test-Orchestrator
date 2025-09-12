@@ -15,6 +15,7 @@ export function rowToTestPlan(row: any): TestPlan {
     id: row.id,
     rootComponentId: row.root_component_id,
     status: row.status,
+    failureReason: row.failure_reason,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

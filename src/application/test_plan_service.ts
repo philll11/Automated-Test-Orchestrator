@@ -32,6 +32,7 @@ export class TestPlanService implements ITestPlanService {
     }
 
     public async initiateDiscovery(rootComponentId: string, credentials: BoomiCredentials): Promise<TestPlan> {
+        console.log(`[SERVICE] initiateDiscovery called for component: ${rootComponentId}`);
         const testPlan: TestPlan = {
             id: uuidv4(),
             rootComponentId,
@@ -42,6 +43,8 @@ export class TestPlanService implements ITestPlanService {
 
         const savedTestPlan = await this.testPlanRepository.save(testPlan);
 
+        console.log(`[SERVICE] TestPlan ${savedTestPlan.id} created. Starting async discovery.`);
+
         // Execute asynchronously and intentionally don't await it
         this.discoverAndSaveAllDependencies(rootComponentId, savedTestPlan.id, credentials)
             .catch(async error => {
@@ -51,8 +54,12 @@ export class TestPlanService implements ITestPlanService {
                 const failedPlan: TestPlan = {
                     ...savedTestPlan,
                     status: 'FAILED',
+                    failureReason: error.message,
                     updatedAt: new Date(),
                 };
+
+                console.log(`[SERVICE] Updating plan ${savedTestPlan.id} to FAILED.`);
+
                 await this.testPlanRepository.update(failedPlan);
             });
 
@@ -60,6 +67,9 @@ export class TestPlanService implements ITestPlanService {
     }
 
     public async discoverAndSaveAllDependencies(rootComponentId: string, testPlanId: string, credentials: BoomiCredentials): Promise<void> {
+
+        console.log(`[SERVICE] discoverAndSaveAllDependencies started for plan ${testPlanId}.`);
+
         const testPlan = await this.testPlanRepository.findById(testPlanId);
         if (!testPlan) throw new Error(`TestPlan with id ${testPlanId} not found.`);
 
@@ -91,6 +101,7 @@ export class TestPlanService implements ITestPlanService {
         } catch (error) {
             console.error(`[TestPlanService] Failed to complete discovery for plan ${testPlanId}:`, error);
             testPlan.status = 'FAILED';
+            testPlan.failureReason = (error instanceof Error) ? error.message : 'An unknown error occurred';
             testPlan.updatedAt = new Date();
             await this.testPlanRepository.update(testPlan);
             throw error;

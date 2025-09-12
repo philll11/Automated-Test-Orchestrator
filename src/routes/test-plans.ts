@@ -78,6 +78,9 @@ const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => P
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.post('/', asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    console.log(`[ROUTE] POST /api/v1/test-plans received.`);
+    console.log(`[ROUTE] Request Body:`, JSON.stringify(req.body, null, 2));
+    
     const { rootComponentId, boomiCredentials } = req.body;
     if (!rootComponentId || !boomiCredentials) {
         throw new BadRequestError('rootComponentId and boomiCredentials are required');

@@ -34,14 +34,14 @@ export class TestPlanRepository implements ITestPlanRepository {
     }
 
     async update(testPlan: TestPlan): Promise<TestPlan> {
-        const { id, status, updatedAt } = testPlan;
+        const { id, status, updatedAt, failureReason } = testPlan;
         const query = `
             UPDATE test_plans
-            SET status = $1, updated_at = $2
-            WHERE id = $3
+            SET status = $1, updated_at = $2, failure_reason = $3
+            WHERE id = $4
             RETURNING *;
         `;
-        const values = [status, updatedAt, id];
+        const values = [status, updatedAt, failureReason || null, id];
         const result = await this.pool.query(query, values);
 
         return rowToTestPlan(result.rows[0]);

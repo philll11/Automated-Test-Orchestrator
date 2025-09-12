@@ -36,6 +36,9 @@ export class BoomiService implements IBoomiService {
     private maxPolls: number;
 
     constructor(credentials: BoomiCredentials, options: PollingOptions = {}) {
+        
+        console.log(`[ADAPTER] Creating BoomiService for account: ${credentials.accountId}`);
+
         this.apiClient = axios.create({
             baseURL: `https://api.boomi.com/api/rest/v1/${credentials.accountId}`,
             auth: {
@@ -52,6 +55,9 @@ export class BoomiService implements IBoomiService {
     }
 
     private async getComponentMetadata(componentId: string): Promise<ComponentMetadataResponse | null> {
+        
+        console.log(`[ADAPTER] getComponentVersion called for component: ${componentId}`);
+
         try {
             const response = await this.apiClient.get<ComponentMetadataResponse>(`/ComponentMetadata/${componentId}`);
             return {
@@ -59,6 +65,14 @@ export class BoomiService implements IBoomiService {
                 version: response.data.version
             };
         } catch (error) {
+            
+            console.error(`[ADAPTER] CATCH BLOCK in getComponentVersion.`);
+            if (axios.isAxiosError(error) && error.response) {
+                console.error(`[ADAPTER] Axios error with status: ${error.response.status}`);
+            } else {
+                console.error(`[ADAPTER] A non-Axios error occurred:`, error);
+            }
+
             if (axios.isAxiosError(error) && error.response) {
                 if ([401, 403, 404].includes(error.response.status)) {
                     throw new AuthenticationError('Boomi API authentication failed. Please check your credentials.');

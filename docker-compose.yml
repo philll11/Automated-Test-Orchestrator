@@ -1,16 +1,17 @@
 services:
   # Development
-  postgres:
+  postgres-dev:
     image: postgres:13
-    container_name: boomi-test-db-dev # Renamed for clarity
+    container_name: boomi-test-db-dev
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: boomi_test_orchestrator
+      POSTGRES_USER: devuser
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: devdb
     ports:
-      - "5432:5432" # Your dev port
+      - "5432:5432"
     volumes:
       - postgres_data_dev:/var/lib/postgresql/data
+      - ./setup.sql:/docker-entrypoint-initdb.d/setup.sql
 
   # Testing
   postgres-test:
@@ -21,7 +22,7 @@ services:
       POSTGRES_PASSWORD: testpassword
       POSTGRES_DB: testdb
     ports:
-      - "5433:5432" # Expose the test DB on a different host port (5433) to avoid conflicts
+      - "5433:5432"
     volumes:
       - postgres_data_test:/var/lib/postgresql/data
       - ./setup.sql:/docker-entrypoint-initdb.d/setup.sql
@@ -32,14 +33,14 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - postgres
+      - postgres-dev
     environment:
-      DB_HOST: postgres
-      DB_USER: postgres
-      DB_PASSWORD: password
-      DB_NAME: boomi_test_orchestrator
+      DB_HOST: postgres-dev
+      DB_USER: devuser
+      DB_PASSWORD: devpassword
+      DB_NAME: devdb
       DB_PORT: 5432
 
 volumes:
-  postgres_data_dev: # Volume for dev DB
-  postgres_data_test: # Volume for test DB
+  postgres_data_dev:
+  postgres_data_test:

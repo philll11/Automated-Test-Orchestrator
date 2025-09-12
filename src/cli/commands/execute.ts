@@ -1,7 +1,8 @@
 import type { Command } from 'commander';
 import ora from 'ora';
 import chalk from 'chalk';
-import { initiateExecution, pollForExecutionCompletion } from '../api_client.js';
+import { initiateExecution, pollForExecutionCompletion, PlanFailedError } from '../api_client.js';
+import type { CliDiscoveredComponent } from '../types.js';
 
 export function registerExecuteCommand(program: Command) {
   program
@@ -10,12 +11,12 @@ export function registerExecuteCommand(program: Command) {
     .requiredOption('-p, --planId <id>', 'The Test Plan ID from the discovery phase')
     .requiredOption('-t, --tests <ids>', 'A comma-separated list of test component IDs to run')
     .action(async (options) => {
-      const testsToRun = options.tests.split(',').map((id: string) => id.trim());
+      const testsToRun = options.tests.split(',').map((id: string) => id.trim()).filter(Boolean);
       if (testsToRun.length === 0) {
         console.error(chalk.red('Error: You must provide at least one test component ID.'));
         process.exit(1);
       }
-      
+
       const spinner = ora(`Initiating execution for Plan ID: ${chalk.cyan(options.planId)}...`).start();
 
       try {
@@ -31,7 +32,7 @@ export function registerExecuteCommand(program: Command) {
         console.log('\n--- Test Execution Report ---');
         let failures = 0;
 
-        finalPlan.discoveredComponents.forEach((comp: any) => {
+        finalPlan.discoveredComponents.forEach((comp: CliDiscoveredComponent) => {
           // Only report on tests that were actually part of this execution run
           if (comp.execution_status) {
             if (comp.execution_status === 'SUCCESS') {
@@ -60,9 +61,14 @@ export function registerExecuteCommand(program: Command) {
 
       } catch (error: any) {
         spinner.fail(chalk.red('Execution failed.'));
-        if (error.code === 'ECONNREFUSED') {
+
+        // Check for our custom error from the API client
+        if (error instanceof PlanFailedError) {
+          console.error(chalk.red(`Reason: ${error.reason}`));
+        } else if (error.code === 'ECONNREFUSED') {
           console.error(chalk.red('Error: Connection refused. Is the backend server running?'));
         } else {
+          // For any other unexpected errors
           console.error(chalk.red(error.message));
         }
         process.exit(1);

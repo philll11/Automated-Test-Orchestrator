@@ -4,7 +4,14 @@ import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../utils/app_error.js';
 
 export const errorHandler = (err: Error, req: Request, res: Response, next: NextFunction) => {
+
+  console.log(`[ERROR HANDLER] Global error handler triggered.`);
+
   if (err instanceof AppError) {
+    
+    console.log(`[ERROR HANDLER] Caught a known AppError: ${err.constructor.name}, Status Code: ${err.statusCode}`);
+    console.log(`[ERROR HANDLER] Error Message: ${err.message}`);
+
     return res.status(err.statusCode).json({
       metadata: {
         code: err.statusCode,
@@ -13,7 +20,7 @@ export const errorHandler = (err: Error, req: Request, res: Response, next: Next
     });
   }
 
-  console.error('UNHANDLED ERROR:', err);
+  console.error('[ERROR HANDLER] UNHANDLED ERROR:', err);
   return res.status(500).json({
     metadata: {
       code: 500,

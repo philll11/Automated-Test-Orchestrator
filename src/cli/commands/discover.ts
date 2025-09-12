@@ -3,7 +3,8 @@
 import type { Command } from 'commander';
 import ora from 'ora';
 import chalk from 'chalk';
-import { initiateDiscovery, pollForPlanCompletion } from '../api_client.js';
+import { initiateDiscovery, pollForPlanCompletion, PlanFailedError } from '../api_client.js';
+import type { CliDiscoveredComponent } from '../types.js';
 
 export function registerDiscoverCommand(program: Command) {
   program
@@ -25,10 +26,10 @@ export function registerDiscoverCommand(program: Command) {
         // 3. Display the results in a user-friendly table
         console.log(`\nTest Plan ID: ${chalk.cyan(planId)}`);
 
-        const displayData = finalPlan.discoveredComponents.map((comp: any) => ({
-          'Component ID': comp.componentId,
-          'Has Test Coverage': comp.hasTestCoverage ? '✅ Yes' : '❌ No',
-          'Test Component ID': comp.testComponentId || 'N/A',
+        const displayData = finalPlan.discoveredComponents.map((comp: CliDiscoveredComponent) => ({
+          'Component ID': comp.component_id,
+          'Has Test Coverage': comp.mapped_test_id ? '✅ Yes' : '❌ No',
+          'Test Component ID': comp.mapped_test_id || 'N/A',
         }));
 
         console.table(displayData);
@@ -37,10 +38,13 @@ export function registerDiscoverCommand(program: Command) {
       } catch (error: any) {
         spinner.fail(chalk.red('Discovery failed.'));
         
-        // Provide a more helpful error message for network errors
-        if (error.code === 'ECONNREFUSED') {
+        // Check if this is our custom error from the API client
+        if (error instanceof PlanFailedError) {
+          console.error(chalk.red(`Reason: ${error.reason}`));
+        } else if (error.code === 'ECONNREFUSED') {
           console.error(chalk.red('Error: Connection refused. Is the backend server running?'));
         } else {
+          // For any other unexpected errors
           console.error(chalk.red(error.message));
         }
         process.exit(1);

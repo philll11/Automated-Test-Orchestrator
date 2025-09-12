@@ -1,16 +1,27 @@
 // src/cli/api_client.ts
 
 import axios from 'axios';
-
-// In a real application, this would come from a configuration file.
-const API_BASE_URL = 'http://localhost:3000/api/v1';
+import type { CliTestPlan } from './types.js';
+import { config } from './config.js';
 
 const apiClient = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: config.API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+/**
+ * A custom error class for the CLI to pass specific failure reasons.
+ */
+export class PlanFailedError extends Error {
+  public readonly reason: string;
+  constructor(reason: string) {
+    super('The test plan failed on the server.');
+    this.name = 'PlanFailedError';
+    this.reason = reason;
+  }
+}
 
 /**
  * A simple delay utility to use in our polling logic.
@@ -34,7 +45,9 @@ export async function initiateDiscovery(rootComponentId: string): Promise<{ plan
       password_or_token: 'dummy-token'
     }
   });
-  return response.data;
+
+  const planId = response.data.data.id;
+  return { planId };
 }
 
 /**
@@ -42,9 +55,9 @@ export async function initiateDiscovery(rootComponentId: string): Promise<{ plan
  * @param planId The ID of the plan to fetch.
  * @returns The full test plan object.
  */
-export async function getPlanStatus(planId: string): Promise<any> { // Replace 'any' with a proper type later
-  const response = await apiClient.get(`/test-plans/${planId}`);
-  return response.data;
+export async function getPlanStatus(planId: string): Promise<CliTestPlan> {
+  const response = await apiClient.get<{ data: CliTestPlan }>(`/test-plans/${planId}`);
+  return response.data.data;
 }
 
 /**
@@ -52,7 +65,7 @@ export async function getPlanStatus(planId: string): Promise<any> { // Replace '
  * @param planId The ID of the plan to poll.
  * @returns The completed test plan object.
  */
-export async function pollForPlanCompletion(planId: string): Promise<any> { // Replace 'any' with a proper type
+export async function pollForPlanCompletion(planId: string): Promise<CliTestPlan> {
   let plan = await getPlanStatus(planId);
 
   // Poll every 2 seconds until discovery is complete or has failed.
@@ -62,7 +75,7 @@ export async function pollForPlanCompletion(planId: string): Promise<any> { // R
   }
 
   if (plan.status === 'FAILED') {
-    throw new Error('The test plan discovery failed on the server.');
+    throw new PlanFailedError(plan.failure_reason || 'An unknown error occurred on the server.');
   }
 
   return plan;
@@ -95,7 +108,7 @@ export async function initiateExecution(planId: string, testsToRun: string[]): P
  * @param planId The ID of the plan to poll.
  * @returns The completed test plan object.
  */
-export async function pollForExecutionCompletion(planId: string): Promise<any> { // Replace 'any' with a proper type
+export async function pollForExecutionCompletion(planId: string): Promise<CliTestPlan> {
   let plan = await getPlanStatus(planId);
 
   // Poll every 3 seconds until execution is complete or has failed.
@@ -105,7 +118,7 @@ export async function pollForExecutionCompletion(planId: string): Promise<any> {
   }
 
   if (plan.status === 'FAILED') {
-    throw new Error('The test plan execution failed on the server.');
+    throw new PlanFailedError(plan.failure_reason || 'The test plan execution failed on the server.');
   }
 
   return plan;
