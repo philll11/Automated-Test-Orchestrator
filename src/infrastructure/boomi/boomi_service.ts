@@ -1,13 +1,14 @@
 // src/infrastructure/boomi/boomi_service.ts
 
 import axios, { AxiosInstance } from 'axios';
-import { IBoomiService, BoomiCredentials, TestExecutionResult, TestExecutionOptions, ComponentInfoAndDependencies } from '../../ports/i_boomi_service.js';
+import { IIntegrationPlatformService, IntegrationPlatformCredentials, TestExecutionResult, TestExecutionOptions, ComponentInfo } from '../../ports/i_integration_platform_service.js';
 import { AuthenticationError } from '../../utils/app_error.js';
 
 // --- Type Definitions for Boomi API Responses ---
 interface ComponentMetadataResponse {
     name: string;
     version: number;
+    type: string;
 }
 
 interface ComponentReference {
@@ -30,12 +31,12 @@ interface PollingOptions {
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-export class BoomiService implements IBoomiService {
+export class BoomiService implements IIntegrationPlatformService {
     private apiClient: AxiosInstance;
     private pollInterval: number;
     private maxPolls: number;
 
-    constructor(credentials: BoomiCredentials, options: PollingOptions = {}) {
+    constructor(credentials: IntegrationPlatformCredentials, options: PollingOptions = {}) {
         
         console.log(`[ADAPTER] Creating BoomiService for account: ${credentials.accountId}`);
 
@@ -43,7 +44,7 @@ export class BoomiService implements IBoomiService {
             baseURL: `https://api.boomi.com/api/rest/v1/${credentials.accountId}`,
             auth: {
                 username: credentials.username,
-                password: credentials.password_or_token,
+                password: credentials.passwordOrToken,
             },
             headers: {
                 'Content-Type': 'application/json',
@@ -62,7 +63,8 @@ export class BoomiService implements IBoomiService {
             const response = await this.apiClient.get<ComponentMetadataResponse>(`/ComponentMetadata/${componentId}`);
             return {
                 name: response.data.name,
-                version: response.data.version
+                version: response.data.version,
+                type: response.data.type,
             };
         } catch (error) {
             
@@ -87,7 +89,7 @@ export class BoomiService implements IBoomiService {
         }
     }
 
-    public async getComponentInfoAndDependencies(componentId: string): Promise<ComponentInfoAndDependencies | null> {
+    public async getComponentInfoAndDependencies(componentId: string): Promise<ComponentInfo | null> {
         const metadata = await this.getComponentMetadata(componentId);
         if (metadata === null) return null; // Component not found, return null
 
@@ -120,7 +122,9 @@ export class BoomiService implements IBoomiService {
             
             // Return the combined object
             return {
+                id: componentId,
                 name: metadata.name,
+                type: metadata.type,
                 dependencyIds: dependencyIds
             };
 
@@ -134,7 +138,7 @@ export class BoomiService implements IBoomiService {
         try {
             const executionRequest = {
                 '@type': 'ExecutionRequest',
-                atomId: options.atomId,
+                atomId: options.executionInstanceId,
                 processId: componentId,
             };
             const initResponse = await this.apiClient.post('/ExecutionRequest', executionRequest);

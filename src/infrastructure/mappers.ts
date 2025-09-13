@@ -33,6 +33,7 @@ export function rowToDiscoveredComponent(row: any): DiscoveredComponent {
     testPlanId: row.test_plan_id,
     componentId: row.component_id,
     componentName: row.component_name,
+    componentType: row.component_type,
     mappedTestId: row.mapped_test_id,
     executionStatus: row.execution_status,
     executionLog: row.execution_log,

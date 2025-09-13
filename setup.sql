@@ -1,4 +1,4 @@
--- This script sets up the initial database schema for the Boomi Automated Test Orchestrator.
+-- This script sets up the initial database schema for the Automated Test Orchestrator.
 
 -- Table: test_plans
 -- Stores the master record for a single orchestration session.
@@ -18,13 +18,14 @@ CREATE TABLE discovered_components (
     test_plan_id UUID NOT NULL REFERENCES test_plans(id),
     component_id VARCHAR(255) NOT NULL,
     component_name VARCHAR(255),
+    component_type VARCHAR(100),
     mapped_test_id VARCHAR(255),
     execution_status VARCHAR(50),
     execution_log TEXT
 );
 
 -- Table: component_test_mappings
--- A persistent lookup table that maps a production Boomi component to its corresponding test component.
+-- A persistent lookup table that maps a production component to its corresponding test component.
 CREATE TABLE component_test_mappings (
     main_component_id VARCHAR(255) PRIMARY KEY,
     test_component_id VARCHAR(255) NOT NULL,

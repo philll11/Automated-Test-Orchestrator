@@ -2,7 +2,7 @@ services:
   # Development
   postgres-dev:
     image: postgres:13
-    container_name: boomi-test-db-dev
+    container_name: test-db-dev
     environment:
       POSTGRES_USER: devuser
       POSTGRES_PASSWORD: devpassword
@@ -16,7 +16,7 @@ services:
   # Testing
   postgres-test:
     image: postgres:13
-    container_name: boomi-test-db-test
+    container_name: test-db-test
     environment:
       POSTGRES_USER: testuser
       POSTGRES_PASSWORD: testpassword
@@ -29,7 +29,7 @@ services:
 
   app:
     build: .
-    container_name: boomi-app
+    container_name: dev-app
     ports:
       - "3000:3000"
     depends_on:

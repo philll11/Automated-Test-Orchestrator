@@ -1,7 +1,7 @@
 // src/routes/test-plans.ts
 
 import { Router, Request, Response, NextFunction } from 'express';
-import { TestPlanService, BoomiServiceFactory } from '../application/test_plan_service.js';
+import { TestPlanService, IntegrationPlatformServiceFactory } from '../application/test_plan_service.js';
 import { TestPlanRepository } from '../infrastructure/repositories/test_plan_repository.js';
 import { DiscoveredComponentRepository } from '../infrastructure/repositories/discovered_component_repository.js';
 import { ComponentTestMappingRepository } from '../infrastructure/repositories/component_test_mapping_repository.js';
@@ -14,7 +14,7 @@ const testPlanRepository = new TestPlanRepository();
 const discoveredComponentRepository = new DiscoveredComponentRepository();
 const componentTestMappingRepository = new ComponentTestMappingRepository();
 
-const boomiServiceFactory: BoomiServiceFactory = (credentials) => {
+const integrationPlatformServiceFactory: IntegrationPlatformServiceFactory = (credentials) => {
     return new BoomiService(credentials);
 };
 
@@ -22,7 +22,7 @@ const testPlanService = new TestPlanService(
     testPlanRepository,
     discoveredComponentRepository,
     componentTestMappingRepository,
-    boomiServiceFactory
+    integrationPlatformServiceFactory
 );
 
 // ----------------------------------------------------
@@ -38,7 +38,7 @@ const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => P
  * /api/v1/test-plans:
  *   post:
  *     summary: Initiate Discovery
- *     description: Initiates a new run by providing a root Boomi Component ID and selecting a connection profile. The discovery process runs asynchronously.
+ *     description: Initiates a new run by providing a root Component ID and selecting a connection profile. The discovery process runs asynchronously.
  *     requestBody:
  *       required: true
  *       content:
@@ -49,14 +49,14 @@ const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => P
  *               rootComponentId:
  *                 type: string
  *                 example: "2582515a-40fb-4d5d-bcc9-10817caa4fa2"
- *               boomiCredentials:
+ *               integrationPlatformCredentials:
  *                 type: object
  *                 properties:
  *                   accountId:
  *                     type: string
  *                   username:
  *                     type: string
- *                   password_or_token:
+ *                   passwordOrToken:
  *                     type: string
  *     responses:
  *       '202':
@@ -81,11 +81,11 @@ router.post('/', asyncHandler(async (req: Request, res: Response, next: NextFunc
     console.log(`[ROUTE] POST /api/v1/test-plans received.`);
     console.log(`[ROUTE] Request Body:`, JSON.stringify(req.body, null, 2));
     
-    const { rootComponentId, boomiCredentials } = req.body;
-    if (!rootComponentId || !boomiCredentials) {
-        throw new BadRequestError('rootComponentId and boomiCredentials are required');
+    const { rootComponentId, integrationPlatformCredentials } = req.body;
+    if (!rootComponentId || !integrationPlatformCredentials) {
+        throw new BadRequestError('rootComponentId and integrationPlatformCredentials are required');
     }
-    const testPlan = await testPlanService.initiateDiscovery(rootComponentId, boomiCredentials);
+    const testPlan = await testPlanService.initiateDiscovery(rootComponentId, integrationPlatformCredentials);
     res.status(202).json({
         metadata: { code: 202, message: 'Accepted' },
         data: testPlan,
@@ -180,13 +180,13 @@ router.get('/:planId', asyncHandler(async (req: Request, res: Response, next: Ne
  */
 router.post('/:planId/execute', asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     const { planId } = req.params;
-    const { testsToRun, boomiCredentials, atomId } = req.body;
+    const { testsToRun, integrationPlatformCredentials, executionInstanceId } = req.body;
 
-    if (!testsToRun || !Array.isArray(testsToRun) || !boomiCredentials || !atomId) {
-        throw new BadRequestError('testsToRun must be an array of component IDs, boomiCredentials and atomId must be provided.');
+    if (!testsToRun || !Array.isArray(testsToRun) || !integrationPlatformCredentials || !executionInstanceId) {
+        throw new BadRequestError('testsToRun must be an array of component IDs, integrationPlatformCredentials and executionInstanceId must be provided.');
     }
 
-    testPlanService.executeTests(planId, testsToRun, boomiCredentials, atomId).catch(err => {
+    testPlanService.executeTests(planId, testsToRun, integrationPlatformCredentials, executionInstanceId).catch(err => {
         console.error(`[Execution Error] for plan ${planId}:`, err);
     });
 
@@ -219,15 +219,15 @@ export default router;
  *         id:
  *           type: string
  *           format: uuid
- *         root_component_id:
+ *         rootComponentId:
  *           type: string
  *         status:
  *           type: string
  *           enum: [PENDING, AWAITING_SELECTION, EXECUTING, COMPLETED, FAILED]
- *         created_at:
+ *         createdAt:
  *           type: string
  *           format: date-time
- *         updated_at:
+ *         updatedAt:
  *           type: string
  *           format: date-time
  *     DiscoveredComponent:
@@ -236,18 +236,20 @@ export default router;
  *         id:
  *           type: string
  *           format: uuid
- *         test_plan_id:
+ *         testPlanId:
  *           type: string
  *           format: uuid
- *         component_id:
+ *         componentId:
  *           type: string
- *         component_name:
+ *         componentName:
  *           type: string
- *         mapped_test_id:
+ *         componentType:
  *           type: string
- *         execution_status:
+ *         mappedTestId:
+ *           type: string
+ *         executionStatus:
  *           type: string
  *           enum: [PENDING, RUNNING, SUCCESS, FAILURE]
- *         execution_log:
+ *         executionLog:
  *           type: string
  */

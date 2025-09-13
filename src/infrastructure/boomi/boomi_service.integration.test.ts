@@ -1,19 +1,19 @@
 import nock from 'nock';
 import { BoomiService } from './boomi_service';
-import { BoomiCredentials, TestExecutionOptions } from '../../ports/i_boomi_service';
+import { IntegrationPlatformCredentials, TestExecutionOptions } from '../../ports/i_integration_platform_service.js';
 
 // Define a scope for our mock API server. This must match the base URL our service creates.
 const BOOMI_API_BASE = 'https://api.boomi.com';
 
 describe('BoomiService Integration Tests', () => {
-    const dummyCredentials: BoomiCredentials = {
+    const dummyCredentials: IntegrationPlatformCredentials = {
         accountId: 'test-account-123',
         username: 'testuser',
-        password_or_token: 'testpass',
+        passwordOrToken: 'testpass'
     };
     const baseApiUrl = `/api/rest/v1/${dummyCredentials.accountId}`;
 
-    const executionOptions: TestExecutionOptions = { atomId: 'test-atom-id-123' };
+    const executionOptions: TestExecutionOptions = { executionInstanceId: 'test-exec-instance-456' };
 
     let consoleWarnSpy: jest.SpyInstance;
 
@@ -34,7 +34,7 @@ describe('BoomiService Integration Tests', () => {
         // Mock the GET /ComponentMetadata endpoint to include the component name
         nock(BOOMI_API_BASE)
             .get(`${baseApiUrl}/ComponentMetadata/${rootComponentId}`)
-            .reply(200, { name: 'Root Component A', version: componentVersion });
+            .reply(200, { name: 'Root Component A', version: componentVersion, type: 'process' });
 
         const expectedPostBody = {
             QueryFilter: {
@@ -70,7 +70,9 @@ describe('BoomiService Integration Tests', () => {
 
         // Assert against the new return structure
         expect(result).toEqual({
+            id: rootComponentId,
             name: 'Root Component A',
+            type: 'process',
             dependencyIds: ['dep-1', 'dep-2']
         });
 
@@ -105,7 +107,7 @@ describe('BoomiService Integration Tests', () => {
         // Mock the GET /ComponentMetadata endpoint to include the component name
         nock(BOOMI_API_BASE)
             .get(`${baseApiUrl}/ComponentMetadata/${rootComponentId}`)
-            .reply(200, { name: 'Root Component C', version: componentVersion });
+            .reply(200, { name: 'Root Component C', version: componentVersion, type: 'process' });
 
         const mockQueryResponse = {
             numberOfResults: 0,
@@ -122,7 +124,9 @@ describe('BoomiService Integration Tests', () => {
 
         // Assert against the new return structure with an empty array
         expect(result).toEqual({
+            id: rootComponentId,
             name: 'Root Component C',
+            type: 'process',
             dependencyIds: []
         });
         expect(nock.isDone()).toBe(true);

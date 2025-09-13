@@ -3,6 +3,7 @@ import ora from 'ora';
 import chalk from 'chalk';
 import { initiateExecution, pollForExecutionCompletion, PlanFailedError } from '../api_client.js';
 import type { CliDiscoveredComponent } from '../types.js';
+import { SecureCredentialService } from '../../infrastructure/secure_credential_service.js';
 
 export function registerExecuteCommand(program: Command) {
   program
@@ -10,39 +11,51 @@ export function registerExecuteCommand(program: Command) {
     .description('Execute a selected set of tests from a Test Plan.')
     .requiredOption('-p, --planId <id>', 'The Test Plan ID from the discovery phase')
     .requiredOption('-t, --tests <ids>', 'A comma-separated list of test component IDs to run')
+    .requiredOption('--creds <profile>', 'The name of the credential profile to use')
     .action(async (options) => {
-      const testsToRun = options.tests.split(',').map((id: string) => id.trim()).filter(Boolean);
+      const { planId, tests, creds: profileName } = options;
+      const testsToRun = tests.split(',').map((id: string) => id.trim()).filter(Boolean);
+
       if (testsToRun.length === 0) {
         console.error(chalk.red('Error: You must provide at least one test component ID.'));
         process.exit(1);
       }
 
-      const spinner = ora(`Initiating execution for Plan ID: ${chalk.cyan(options.planId)}...`).start();
-
+      const spinner = ora('Preparing execution...').start();
       try {
-        // 1. Initiate the execution
-        await initiateExecution(options.planId, testsToRun);
-        spinner.text = `Execution in progress. Waiting for results...`;
+        // 1. Retrieve secure credentials
+        spinner.text = `Loading credentials for profile: ${chalk.cyan(profileName)}`;
+        const credentialService = new SecureCredentialService();
+        const credentials = await credentialService.getCredentials(profileName);
 
-        // 2. Poll for completion
-        const finalPlan = await pollForExecutionCompletion(options.planId);
+        if (!credentials) {
+          throw new Error(`Credentials for profile "${profileName}" not found. Please add them using 'ato creds add ${profileName}'.`);
+        }
+
+        // 2. Initiate the execution
+        spinner.text = `Initiating execution for Plan ID: ${chalk.cyan(planId)}...`;
+        await initiateExecution(planId, testsToRun, credentials);
+        spinner.text = 'Execution in progress. Waiting for results...';
+
+        // 3. Poll for completion
+        const finalPlan = await pollForExecutionCompletion(planId);
         spinner.succeed(chalk.green('Execution complete!'));
 
-        // 3. Render the Jest-like report
+        // 4. Render the Jest-like report
         console.log('\n--- Test Execution Report ---');
         let failures = 0;
 
         finalPlan.discoveredComponents.forEach((comp: CliDiscoveredComponent) => {
           // Only report on tests that were actually part of this execution run
-          if (comp.execution_status) {
-            if (comp.execution_status === 'SUCCESS') {
-              console.log(`${chalk.green('PASS')} ${comp.component_name || comp.component_id}`);
-            } else if (comp.execution_status === 'FAILURE') {
+          if (comp.executionStatus) {
+            if (comp.executionStatus === 'SUCCESS') {
+              console.log(`${chalk.green('PASS')} ${comp.componentName || comp.componentId}`);
+            } else if (comp.executionStatus === 'FAILURE') {
               failures++;
-              console.log(`${chalk.red('FAIL')} ${comp.component_name || comp.component_id}`);
+              console.log(`${chalk.red('FAIL')} ${comp.componentName || comp.componentId}`);
               // Indent and print the log for failures
-              if (comp.execution_log) {
-                const indentedLog = comp.execution_log.split('\n').map((line: string) => `  > ${line}`).join('\n');
+              if (comp.executionLog) {
+                const indentedLog = comp.executionLog.split('\n').map((line: string) => `  > ${line}`).join('\n');
                 console.log(chalk.gray(indentedLog));
               }
             }

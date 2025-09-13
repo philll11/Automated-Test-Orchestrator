@@ -18,13 +18,13 @@ export class DiscoveredComponentRepository implements IDiscoveredComponentReposi
         try {
             await client.query('BEGIN');
             for (const component of components) {
-                const { id, testPlanId, componentId, componentName, mappedTestId, executionStatus, executionLog } = component;
+                const { id, testPlanId, componentId, componentName, componentType, mappedTestId, executionStatus, executionLog } = component;
                 const query = `
-                    INSERT INTO discovered_components (id, test_plan_id, component_id, component_name, mapped_test_id, execution_status, execution_log)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    INSERT INTO discovered_components (id, test_plan_id, component_id, component_name, component_type, mapped_test_id, execution_status, execution_log)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                     ON CONFLICT (id) DO NOTHING;
                 `;
-                const values = [id, testPlanId, componentId, componentName, mappedTestId, executionStatus, executionLog];
+                const values = [id, testPlanId, componentId, componentName, componentType, mappedTestId, executionStatus, executionLog];
                 await client.query(query, values);
             }
             await client.query('COMMIT');

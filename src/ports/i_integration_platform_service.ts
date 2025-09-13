@@ -1,13 +1,13 @@
-// src/ports/i_boomi_service.ts
+// src/ports/i_integration_platform_service.ts
 
-export interface BoomiCredentials {
+export interface IntegrationPlatformCredentials {
     accountId: string;
     username: string;
-    password_or_token: string;
+    passwordOrToken: string;
 }
 
 export interface TestExecutionOptions {
-  atomId: string;
+  executionInstanceId: string;
 }
 
 export interface TestExecutionResult {
@@ -16,12 +16,14 @@ export interface TestExecutionResult {
   executionLogUrl?: string;
 }
 
-export interface ComponentInfoAndDependencies {
+export interface ComponentInfo {
+  id: string;
   name: string;
+  type: string;
   dependencyIds: string[];
 }
 
-export interface IBoomiService {
-  getComponentInfoAndDependencies(componentId: string): Promise<ComponentInfoAndDependencies | null>;
+export interface IIntegrationPlatformService {
+  getComponentInfoAndDependencies(componentId: string): Promise<ComponentInfo | null>;
   executeTestProcess(componentId: string, options: TestExecutionOptions): Promise<TestExecutionResult>;
 }

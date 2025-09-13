@@ -15,9 +15,9 @@ describe('Execution End-to-End Test', () => {
     const credentials = {
         accountId: 'test-account-e2e',
         username: 'testuser',
-        password_or_token: 'testpass',
+        passwordOrToken: 'testpass',
     };
-    const atomId = 'test-atom-e2e';
+    const executionInstanceId = 'test-atom-e2e';
     const baseApiUrl = `/api/rest/v1/${credentials.accountId}`;
 
     beforeAll(() => {
@@ -63,6 +63,7 @@ describe('Execution End-to-End Test', () => {
             testPlanId: planId,
             componentId: 'comp-abc',
             componentName: 'Component to Test',
+            componentType: 'process',
             mappedTestId: 'test-abc-123',
             executionStatus: 'PENDING', // Set the correct initial state
         };
@@ -71,17 +72,18 @@ describe('Execution End-to-End Test', () => {
             testPlanId: planId,
             componentId: 'comp-def',
             componentName: 'Component to Ignore',
+            componentType: 'process',
             mappedTestId: 'test-def-456',
             executionStatus: 'PENDING', // Set the correct initial state
         };
 
         // Updated INSERT query to include the new columns
         await testPool.query(
-            `INSERT INTO discovered_components (id, test_plan_id, component_id, component_name, mapped_test_id, execution_status) 
-             VALUES ($1, $2, $3, $4, $5, $6), ($7, $8, $9, $10, $11, $12)`,
+            `INSERT INTO discovered_components (id, test_plan_id, component_id, component_name, component_type, mapped_test_id, execution_status) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7), ($8, $9, $10, $11, $12, $13, $14)`,
             [
-                componentToTest.id, planId, componentToTest.componentId, componentToTest.componentName, componentToTest.mappedTestId, componentToTest.executionStatus,
-                componentToIgnore.id, planId, componentToIgnore.componentId, componentToIgnore.componentName, componentToIgnore.mappedTestId, componentToIgnore.executionStatus
+                componentToTest.id, planId, componentToTest.componentId, componentToTest.componentName, componentToTest.componentType, componentToTest.mappedTestId, componentToTest.executionStatus,
+                componentToIgnore.id, planId, componentToIgnore.componentId, componentToIgnore.componentName, componentToIgnore.componentType, componentToIgnore.mappedTestId, componentToIgnore.executionStatus
             ]
         );
 
@@ -101,7 +103,7 @@ describe('Execution End-to-End Test', () => {
             .send({
                 testsToRun: [componentToTest.mappedTestId],
                 boomiCredentials: credentials,
-                atomId: atomId,
+                executionInstanceId: executionInstanceId,
             })
             .expect(202);
 

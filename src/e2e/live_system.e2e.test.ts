@@ -21,19 +21,19 @@ const pollForStatus = async (planId: string, targetStatus: string, timeout: numb
 
 describe('Live System End-to-End Tests', () => {
     let testPool: Pool;
-    const boomiCredentials = {
+    const integrationPlatformCredentials = {
         accountId: process.env.BOOMI_TEST_ACCOUNT_ID!,
         username: process.env.BOOMI_TEST_USERNAME!,
-        password_or_token: process.env.BOOMI_TEST_TOKEN!,
+        passwordOrToken: process.env.BOOMI_TEST_TOKEN!,
     };
     const rootComponentId = process.env.BOOMI_TEST_ROOT_COMPONENT_ID!;
     const mappedTestId = process.env.BOOMI_TEST_MAPPED_TEST_ID!;
-    const atomId = process.env.BOOMI_TEST_ATOM_ID!;
+    const executionInstanceId = process.env.BOOMI_TEST_ATOM_ID!;
 
     // --- Global Setup & Teardown ---
     beforeAll(() => {
         // Ensure all required environment variables are present
-        if (!boomiCredentials.accountId || !boomiCredentials.username || !boomiCredentials.password_or_token || !rootComponentId || !mappedTestId || !atomId) {
+        if (!integrationPlatformCredentials.accountId || !integrationPlatformCredentials.username || !integrationPlatformCredentials.passwordOrToken || !rootComponentId || !mappedTestId || !executionInstanceId) {
             throw new Error('Missing one or more required BOOMI_TEST environment variables in .env.test');
         }
 
@@ -70,7 +70,7 @@ describe('Live System End-to-End Tests', () => {
             // 1. Initiate Discovery via API
             const discoveryResponse = await request(app)
                 .post('/api/v1/test-plans')
-                .send({ rootComponentId, boomiCredentials })
+                .send({ rootComponentId, integrationPlatformCredentials })
                 .expect(202);
 
             const planId = discoveryResponse.body.data.id;
@@ -110,9 +110,9 @@ describe('Live System End-to-End Tests', () => {
 
             // 2. Create a discovered component linked to the plan that we can execute
             await testPool.query(
-                `INSERT INTO discovered_components (id, test_plan_id, component_id, component_name, mapped_test_id, execution_status) 
-                 VALUES ($1, $2, $3, $4, $5, $6)`,
-                [uuidv4(), planId, rootComponentId, 'Root Component', mappedTestId, 'PENDING']
+                `INSERT INTO discovered_components (id, test_plan_id, component_id, component_name, component_type, mapped_test_id, execution_status) 
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                [uuidv4(), planId, rootComponentId, 'Root Component', 'process', mappedTestId, 'PENDING']
             );
         });
 
@@ -122,8 +122,8 @@ describe('Live System End-to-End Tests', () => {
                 .post(`/api/v1/test-plans/${planId}/execute`)
                 .send({
                     testsToRun: [mappedTestId], // User selects the test to run
-                    boomiCredentials,
-                    atomId
+                    integrationPlatformCredentials,
+                    executionInstanceId
                 })
                 .expect(202);
 

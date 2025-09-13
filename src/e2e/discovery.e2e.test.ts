@@ -38,7 +38,7 @@ describe('Discovery End-to-End Test', () => {
         const credentials = {
             accountId: 'test-account-e2e',
             username: 'testuser',
-            password_or_token: 'testpass',
+            passwordOrToken: 'testpass',
         };
         const baseApiUrl = `/api/rest/v1/${credentials.accountId}`;
         const requestBody = { rootComponentId, boomiCredentials: credentials };

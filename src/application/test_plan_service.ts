@@ -4,34 +4,34 @@ import { v4 as uuidv4 } from 'uuid';
 import { ITestPlanService } from "../ports/i_test_plan_service.js";
 import { TestPlan } from "../domain/test_plan.js";
 import { ITestPlanRepository } from "../ports/i_test_plan_repository.js";
-import { BoomiCredentials, IBoomiService } from "../ports/i_boomi_service.js";
+import { IntegrationPlatformCredentials, IIntegrationPlatformService, ComponentInfo } from "../ports/i_integration_platform_service.js";
 import { DiscoveredComponent } from "../domain/discovered_component.js";
 import { IDiscoveredComponentRepository } from "../ports/i_discovered_component_repository.js";
 import { IComponentTestMappingRepository } from "../ports/i_component_test_mapping_repository.js";
 
-// This is a "factory" to create a BoomiService. In a real app, this might be more complex.
-// We pass this factory into the service so we can control BoomiService creation.
-export type BoomiServiceFactory = (credentials: BoomiCredentials) => IBoomiService;
+// This is a "factory" to create a IntegrationPlatformService. In a real app, this might be more complex.
+// We pass this factory into the service so we can control IntegrationPlatformService creation.
+export type IntegrationPlatformServiceFactory = (credentials: IntegrationPlatformCredentials) => IIntegrationPlatformService;
 
 export class TestPlanService implements ITestPlanService {
     private readonly testPlanRepository: ITestPlanRepository;
     private readonly discoveredComponentRepository: IDiscoveredComponentRepository;
     private readonly componentTestMappingRepository: IComponentTestMappingRepository;
-    private readonly boomiServiceFactory: BoomiServiceFactory;
+    private readonly integrationPlatformServiceFactory: IntegrationPlatformServiceFactory;
 
     constructor(
         testPlanRepository: ITestPlanRepository,
         discoveredComponentRepository: IDiscoveredComponentRepository,
         componentTestMappingRepository: IComponentTestMappingRepository,
-        boomiServiceFactory: BoomiServiceFactory
+        integrationPlatformServiceFactory: IntegrationPlatformServiceFactory
     ) {
         this.testPlanRepository = testPlanRepository;
         this.discoveredComponentRepository = discoveredComponentRepository;
         this.componentTestMappingRepository = componentTestMappingRepository;
-        this.boomiServiceFactory = boomiServiceFactory;
+        this.integrationPlatformServiceFactory = integrationPlatformServiceFactory;
     }
 
-    public async initiateDiscovery(rootComponentId: string, credentials: BoomiCredentials): Promise<TestPlan> {
+    public async initiateDiscovery(rootComponentId: string, credentials: IntegrationPlatformCredentials): Promise<TestPlan> {
         console.log(`[SERVICE] initiateDiscovery called for component: ${rootComponentId}`);
         const testPlan: TestPlan = {
             id: uuidv4(),
@@ -66,7 +66,7 @@ export class TestPlanService implements ITestPlanService {
         return savedTestPlan;
     }
 
-    public async discoverAndSaveAllDependencies(rootComponentId: string, testPlanId: string, credentials: BoomiCredentials): Promise<void> {
+    public async discoverAndSaveAllDependencies(rootComponentId: string, testPlanId: string, credentials: IntegrationPlatformCredentials): Promise<void> {
 
         console.log(`[SERVICE] discoverAndSaveAllDependencies started for plan ${testPlanId}.`);
 
@@ -74,23 +74,25 @@ export class TestPlanService implements ITestPlanService {
         if (!testPlan) throw new Error(`TestPlan with id ${testPlanId} not found.`);
 
         try {
-            const boomiService = this.boomiServiceFactory(credentials);
+            const integrationPlatformService = this.integrationPlatformServiceFactory(credentials);
 
-            const discoveredComponentsMap = new Map<string, string>();
-            await this.findAllDependenciesRecursive(rootComponentId, boomiService, discoveredComponentsMap);
+            const discoveredComponentsMap = await this._findAllDependenciesRecursive(rootComponentId, integrationPlatformService);
 
             const componentIds = Array.from(discoveredComponentsMap.keys());
-
             const testMappings = await this.componentTestMappingRepository.findAllTestMappings(componentIds);
 
-            const discoveredComponents: DiscoveredComponent[] = componentIds.map(componentId => ({
-                id: uuidv4(),
-                testPlanId,
-                componentId,
-                componentName: discoveredComponentsMap.get(componentId),
-                mappedTestId: testMappings.get(componentId),
-                executionStatus: 'PENDING',
-            }));
+            const discoveredComponents: DiscoveredComponent[] = componentIds.map(componentId => {
+                const info = discoveredComponentsMap.get(componentId)!;
+                return {
+                    id: uuidv4(),
+                    testPlanId,
+                    componentId,
+                    componentName: info.name,
+                    componentType: info.type,
+                    mappedTestId: testMappings.get(componentId),
+                    executionStatus: 'PENDING',
+                };
+            });
 
             await this.discoveredComponentRepository.saveAll(discoveredComponents);
 
@@ -108,30 +110,30 @@ export class TestPlanService implements ITestPlanService {
         }
     }
 
-    private async findAllDependenciesRecursive(componentId: string, boomiService: IBoomiService, discoveredComponentsMap: Map<string, string>): Promise<void> {
+    private async _findAllDependenciesRecursive(rootComponentId: string, integrationPlatformService: IIntegrationPlatformService ): Promise<Map<string, ComponentInfo>> {
 
-        if (discoveredComponentsMap.has(componentId)) return; // Already processed this component
+        const finalMap = new Map<string, ComponentInfo>();
 
-        const componentInfo = await boomiService.getComponentInfoAndDependencies(componentId);
+        const _recursiveHelper = async (componentId: string): Promise<void> => {
+            if (finalMap.has(componentId)) return; // Already processed
 
-        // In theory, the only time componentInfo is null is if the root component doesn't exist.
-        // Or if the component was deleted during the discovery process.
-        // Either way, record it and return.
-        if (!componentInfo) {
-            discoveredComponentsMap.set(componentId, 'Component Not Found');
-            return;
-        }
+            const componentInfo = await integrationPlatformService.getComponentInfoAndDependencies(componentId);
 
-        discoveredComponentsMap.set(componentId, componentInfo.name);
+            if (!componentInfo) {
+                finalMap.set(componentId, { id: componentId, name: 'Component Not Found', type: 'N/A', dependencyIds: [] });
+                return;
+            }
+            finalMap.set(componentId, componentInfo);
 
-        const discoveryPromises = componentInfo.dependencyIds.map(depId =>
-            this.findAllDependenciesRecursive(depId, boomiService, discoveredComponentsMap)
-        );
+            const discoveryPromises = componentInfo.dependencyIds.map(depId => _recursiveHelper(depId));
+            await Promise.all(discoveryPromises);
+        };
 
-        await Promise.all(discoveryPromises);
+        await _recursiveHelper(rootComponentId);
+        return finalMap;
     }
 
-    public async executeTests(planId: string, testsToRun: string[], credentials: BoomiCredentials, atomId: string): Promise<void> {
+    public async executeTests(planId: string, testsToRun: string[], credentials: IntegrationPlatformCredentials, executionInstanceId: string): Promise<void> {
         const testPlan = await this.testPlanRepository.findById(planId);
         if (!testPlan) {
             throw new Error(`TestPlan with id ${planId} not found.`);
@@ -155,7 +157,7 @@ export class TestPlanService implements ITestPlanService {
                 executionStatus: 'RUNNING'
             });
 
-            const result = await this.boomiServiceFactory(credentials).executeTestProcess(component.mappedTestId!, { atomId });
+            const result = await this.integrationPlatformServiceFactory(credentials).executeTestProcess(component.mappedTestId!, { executionInstanceId });
 
             await this.discoveredComponentRepository.update({
                 ...component,

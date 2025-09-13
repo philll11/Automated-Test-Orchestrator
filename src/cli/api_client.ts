@@ -3,6 +3,7 @@
 import axios from 'axios';
 import type { CliTestPlan } from './types.js';
 import { config } from './config.js';
+import { IntegrationPlatformCredentials } from '../domain/integration_platform_credentials.js';
 
 const apiClient = axios.create({
   baseURL: config.API_BASE_URL,
@@ -31,19 +32,13 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 /**
  * Initiates the discovery process.
  * @param rootComponentId The component to start discovery from.
+ * @param credentials The secure integration credentials for the API call.
  * @returns The newly created planId.
  */
-export async function initiateDiscovery(rootComponentId: string): Promise<{ planId: string }> {
-  // The backend API requires boomiCredentials, even for discovery.
-  // We will pass dummy data for now, matching the pattern in initiateExecution.
-  // This will be replaced later by a secure credential management system.
+export async function initiateDiscovery(rootComponentId: string, credentials: IntegrationPlatformCredentials): Promise<{ planId: string }> {
   const response = await apiClient.post('/test-plans', {
     rootComponentId,
-    boomiCredentials: {
-      accountId: 'dummy-account-id',
-      username: 'dummy-username',
-      password_or_token: 'dummy-token'
-    }
+    integrationPlatformCredentials: credentials
   });
 
   const planId = response.data.data.id;
@@ -75,7 +70,7 @@ export async function pollForPlanCompletion(planId: string): Promise<CliTestPlan
   }
 
   if (plan.status === 'FAILED') {
-    throw new PlanFailedError(plan.failure_reason || 'An unknown error occurred on the server.');
+    throw new PlanFailedError(plan.failureReason || 'An unknown error occurred on the server.');
   }
 
   return plan;
@@ -85,20 +80,16 @@ export async function pollForPlanCompletion(planId: string): Promise<CliTestPlan
  * Initiates the execution of selected tests for a given plan.
  * @param planId The ID of the plan to execute.
  * @param testsToRun An array of test component IDs to execute.
+ * @param credentials The secure integration credentials for the API call.
  * @returns The initial response from the server.
  */
-export async function initiateExecution(planId: string, testsToRun: string[]): Promise<any> {
-  // The backend API requires the full credentials and atomId for now.
-  // We will pass dummy data for the CLI, as this will be handled by
+export async function initiateExecution(planId: string, testsToRun: string[], credentials: IntegrationPlatformCredentials): Promise<any> {
+  // We will pass a dummy executionInstanceId for now, as this will be handled by
   // a secure configuration service later.
   const response = await apiClient.post(`/test-plans/${planId}/execute`, {
     testsToRun,
-    boomiCredentials: {
-      accountId: 'dummy-account-id',
-      username: 'dummy-username',
-      password_or_token: 'dummy-token'
-    },
-    atomId: 'dummy-atom-id'
+    integrationPlatformCredentials: credentials,
+    executionInstanceId: credentials.executionInstanceId
   });
   return response.data;
 }
@@ -118,7 +109,7 @@ export async function pollForExecutionCompletion(planId: string): Promise<CliTes
   }
 
   if (plan.status === 'FAILED') {
-    throw new PlanFailedError(plan.failure_reason || 'The test plan execution failed on the server.');
+    throw new PlanFailedError(plan.failureReason || 'The test plan execution failed on the server.');
   }
 
   return plan;

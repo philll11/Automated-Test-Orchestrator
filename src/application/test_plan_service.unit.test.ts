@@ -1,12 +1,12 @@
 // src/application/test_plan_service.test.ts
 
-import { TestPlanService, BoomiServiceFactory } from './test_plan_service';
-import { ITestPlanRepository } from '../ports/i_test_plan_repository';
-import { IDiscoveredComponentRepository } from '../ports/i_discovered_component_repository';
-import { DiscoveredComponent } from '../domain/discovered_component';
-import { IComponentTestMappingRepository } from '../ports/i_component_test_mapping_repository';
-import { IBoomiService, BoomiCredentials, ComponentInfoAndDependencies } from '../ports/i_boomi_service';
-import { TestPlan } from '../domain/test_plan';
+import { TestPlanService, IntegrationPlatformServiceFactory } from './test_plan_service.js';
+import { ITestPlanRepository } from '../ports/i_test_plan_repository.js';
+import { IDiscoveredComponentRepository } from '../ports/i_discovered_component_repository.js';
+import { DiscoveredComponent } from '../domain/discovered_component.js';
+import { IComponentTestMappingRepository } from '../ports/i_component_test_mapping_repository.js';
+import { IIntegrationPlatformService, IntegrationPlatformCredentials, ComponentInfo } from '../ports/i_integration_platform_service.js';
+import { TestPlan } from '../domain/test_plan.js';
 
 // Use jest.mock() to create automatic mocks of our interfaces
 const mockTestPlanRepo: jest.Mocked<ITestPlanRepository> = {
@@ -26,20 +26,20 @@ const mockComponentTestMappingRepo: jest.Mocked<IComponentTestMappingRepository>
     findAllTestMappings: jest.fn(),
 };
 
-const mockBoomiService: jest.Mocked<IBoomiService> = {
+const mockIntegrationService: jest.Mocked<IIntegrationPlatformService> = {
     getComponentInfoAndDependencies: jest.fn(),
     executeTestProcess: jest.fn(),
 };
 
-// Mock the Boomi Service Factory
-const mockBoomiServiceFactory: jest.Mocked<BoomiServiceFactory> = jest.fn(() => mockBoomiService);
+// Mock the Integration Service Factory
+const mockIntegrationServiceFactory: jest.Mocked<IntegrationPlatformServiceFactory> = jest.fn(() => mockIntegrationService);
 
 // A helper to allow async "fire-and-forget" tasks to complete within a test
 const allowAsyncOperations = () => new Promise(process.nextTick);
 
 describe('TestPlanService', () => {
     let service: TestPlanService;
-    const dummyCredentials: BoomiCredentials = { accountId: 'test', username: 'test', password_or_token: 'test' };
+    const dummyCredentials: IntegrationPlatformCredentials = { accountId: 'test', username: 'test', passwordOrToken: 'test' };
 
     let consoleErrorSpy: jest.SpyInstance;
 
@@ -50,7 +50,7 @@ describe('TestPlanService', () => {
             mockTestPlanRepo,
             mockDiscoveredComponentRepo,
             mockComponentTestMappingRepo,
-            mockBoomiServiceFactory
+            mockIntegrationServiceFactory
         );
     });
 
@@ -91,13 +91,13 @@ describe('TestPlanService', () => {
             mockTestPlanRepo.findById.mockResolvedValue(testPlan);
 
             // Mock the dependency graph with the correct return structure
-            mockBoomiService.getComponentInfoAndDependencies
-                .mockImplementation(async (id: string): Promise<ComponentInfoAndDependencies | null> => {
+            mockIntegrationService.getComponentInfoAndDependencies
+                .mockImplementation(async (id: string): Promise<ComponentInfo | null> => {
                     switch (id) {
-                        case rootId: return { name: 'Root Component', dependencyIds: [childId1, childId2] };
-                        case childId1: return { name: 'Child Component 1', dependencyIds: [grandChildId] };
-                        case childId2: return { name: 'Child Component 2', dependencyIds: [] };
-                        case grandChildId: return { name: 'GrandChild Component', dependencyIds: [] };
+                        case rootId: return { id: rootId, name: 'Root Component', type: 'process', dependencyIds: [childId1, childId2] };
+                        case childId1: return { id: childId1, name: 'Child Component 1', type: 'process', dependencyIds: [grandChildId] };
+                        case childId2: return { id: childId2, name: 'Child Component 2', type: 'process', dependencyIds: [] };
+                        case grandChildId: return { id: grandChildId, name: 'GrandChild Component', type: 'process', dependencyIds: [] };
                         default: return null;
                     }
                 });
@@ -120,6 +120,10 @@ describe('TestPlanService', () => {
             expect(rootComponent?.componentName).toBe('Root Component');
             expect(child1Component?.componentName).toBe('Child Component 1');
 
+            // Verify component types are saved correctly
+            expect(rootComponent?.componentType).toBe('process');
+            expect(child1Component?.componentType).toBe('process');
+
             // Verify the default execution status is PENDING for all components
             expect(savedComponents.every(c => c.executionStatus === 'PENDING')).toBe(true);
             
@@ -139,11 +143,11 @@ describe('TestPlanService', () => {
             mockTestPlanRepo.findById.mockResolvedValue(testPlan);
 
             // Mock a circular dependency with the correct return structure
-            mockBoomiService.getComponentInfoAndDependencies
-                .mockImplementation(async (id: string): Promise<ComponentInfoAndDependencies | null> => {
+            mockIntegrationService.getComponentInfoAndDependencies
+                .mockImplementation(async (id: string): Promise<ComponentInfo | null> => {
                     switch (id) {
-                        case rootId: return { name: 'Root Component', dependencyIds: [childId1] };
-                        case childId1: return { name: 'Child Component 1', dependencyIds: [rootId] };
+                        case rootId: return { id: rootId, name: 'Root Component', type: 'process', dependencyIds: [childId1] };
+                        case childId1: return { id: childId1, name: 'Child Component 1', type: 'process', dependencyIds: [rootId] };
                         default: return null;
                     }
                 });
@@ -151,19 +155,19 @@ describe('TestPlanService', () => {
             mockComponentTestMappingRepo.findAllTestMappings.mockResolvedValue(new Map());
             await service.discoverAndSaveAllDependencies(rootId, testPlan.id, dummyCredentials);
 
-            expect(mockBoomiService.getComponentInfoAndDependencies).toHaveBeenCalledTimes(2);
-            expect(mockBoomiService.getComponentInfoAndDependencies).toHaveBeenCalledWith(rootId);
-            expect(mockBoomiService.getComponentInfoAndDependencies).toHaveBeenCalledWith(childId1);
+            expect(mockIntegrationService.getComponentInfoAndDependencies).toHaveBeenCalledTimes(2);
+            expect(mockIntegrationService.getComponentInfoAndDependencies).toHaveBeenCalledWith(rootId);
+            expect(mockIntegrationService.getComponentInfoAndDependencies).toHaveBeenCalledWith(childId1);
 
             expect(mockDiscoveredComponentRepo.saveAll).toHaveBeenCalledTimes(1);
             const savedComponents = mockDiscoveredComponentRepo.saveAll.mock.calls[0][0];
             expect(savedComponents.length).toBe(2);
         });
 
-        it('should update the test plan status to FAILED if the Boomi service throws an error', async () => {
+        it('should update the test plan status to FAILED if the Integration service throws an error', async () => {
             mockTestPlanRepo.findById.mockResolvedValue(testPlan);
-            const apiError = new Error("Boomi API is down");
-            mockBoomiService.getComponentInfoAndDependencies.mockRejectedValue(apiError);
+            const apiError = new Error("Integration API is down");
+            mockIntegrationService.getComponentInfoAndDependencies.mockRejectedValue(apiError);
 
             // Use a try-catch to swallow the error that the service re-throws, allowing us to assert on the aftermath
             try {
@@ -205,14 +209,14 @@ describe('TestPlanService', () => {
             mockTestPlanRepo.findById.mockResolvedValue(createReadyTestPlan());
             mockDiscoveredComponentRepo.findByTestPlanId.mockResolvedValue(createDiscoveredComponents());
             const testsToRun = ['test-A', 'test-B'];
-            mockBoomiService.executeTestProcess.mockResolvedValue({ status: 'SUCCESS', message: 'All good!' });
+            mockIntegrationService.executeTestProcess.mockResolvedValue({ status: 'SUCCESS', message: 'All good!' });
 
             await service.executeTests(planId, testsToRun, dummyCredentials, dummyAtomId);
 
             expect(mockTestPlanRepo.update).toHaveBeenCalledTimes(2);
             expect(mockTestPlanRepo.update.mock.calls[0][0]).toEqual(expect.objectContaining({ status: 'EXECUTING' }));
             expect(mockTestPlanRepo.update.mock.calls[1][0]).toEqual(expect.objectContaining({ status: 'COMPLETED' }));
-            expect(mockBoomiService.executeTestProcess).toHaveBeenCalledTimes(2);
+            expect(mockIntegrationService.executeTestProcess).toHaveBeenCalledTimes(2);
             expect(mockDiscoveredComponentRepo.update).toHaveBeenCalledTimes(4);
         });
 
@@ -220,7 +224,7 @@ describe('TestPlanService', () => {
             mockTestPlanRepo.findById.mockResolvedValue(createReadyTestPlan());
             mockDiscoveredComponentRepo.findByTestPlanId.mockResolvedValue(createDiscoveredComponents());
             const testsToRun = ['test-A', 'test-D'];
-            mockBoomiService.executeTestProcess
+            mockIntegrationService.executeTestProcess
                 .mockResolvedValueOnce({ status: 'SUCCESS', message: 'Test A passed' })
                 .mockResolvedValueOnce({ status: 'FAILURE', message: 'Test D failed' });
 
