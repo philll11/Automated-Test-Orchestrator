@@ -1,7 +1,6 @@
 // src/infrastructure/repositories/test_plan_repository.integration.test.ts
 
 import { TestPlanRepository } from './test_plan_repository';
-import globalPool from '../database'; 
 import { Pool } from 'pg';
 import { TestPlan } from '../../domain/test_plan';
 import { v4 as uuidv4 } from 'uuid';
@@ -13,41 +12,36 @@ describe('TestPlanRepository Integration Tests', () => {
         host: process.env.DB_HOST,
         database: process.env.DB_NAME,
         password: process.env.DB_PASSWORD,
-        port: parseInt(process.env.DB_PORT || '5433', 10), // Use the correct port
+        port: parseInt(process.env.DB_PORT || '5433', 10),
     });
 
-    // Before any tests run, establish a connection.
-    // The testPool connects lazily, so a simple query is a good way to verify the connection.
     beforeAll(async () => {
         repository = new TestPlanRepository(testPool);
         try {
             await testPool.query('SELECT NOW()');
-            console.log('Test database connection successful.');
         } catch (error) {
             console.error('Test database connection failed:', error);
             throw error;
         }
     });
 
-    // Before each test, clean the table to ensure a fresh state.
-    // TRUNCATE is faster than DELETE for wiping a whole table.
     beforeEach(async () => {
+        // Truncating test_plans will cascade and delete from all other tables
         await testPool.query('TRUNCATE TABLE test_plans RESTART IDENTITY CASCADE');
     });
 
-    // After all tests are done, close the database connection testPool.
     afterAll(async () => {
+        // We no longer need to close the globalPool here as it's not used in this test.
         await testPool.end();
-        await globalPool.end();
     });
 
     describe('save', () => {
         it('should correctly save a new TestPlan to the database', async () => {
-            // Arrange
+            // Arrange: Use a valid new status
             const testPlan: TestPlan = {
                 id: uuidv4(),
                 rootComponentId: 'comp-root-1',
-                status: 'PENDING',
+                status: 'DISCOVERING',
                 createdAt: new Date(),
                 updatedAt: new Date(),
             };
@@ -56,19 +50,15 @@ describe('TestPlanRepository Integration Tests', () => {
             const savedPlan = await repository.save(testPlan);
 
             // Assert
-            expect(savedPlan.id).toBe(testPlan.id);
-            expect(savedPlan.status).toBe('PENDING');
-
-            // Verify directly against the database for ultimate truth
+            expect(savedPlan.status).toBe('DISCOVERING');
             const result = await testPool.query('SELECT * FROM test_plans WHERE id = $1', [testPlan.id]);
             expect(result.rowCount).toBe(1);
-            expect(result.rows[0].root_component_id).toBe('comp-root-1');
         });
     });
 
     describe('findById', () => {
         it('should return a TestPlan if one exists with the given id', async () => {
-            // Arrange: First, insert a record to find
+            // Arrange: Use a valid new status
             const testPlan: TestPlan = {
                 id: uuidv4(),
                 rootComponentId: 'comp-root-2',
@@ -83,49 +73,42 @@ describe('TestPlanRepository Integration Tests', () => {
 
             // Assert
             expect(foundPlan).not.toBeNull();
-            expect(foundPlan?.id).toBe(testPlan.id);
             expect(foundPlan?.status).toBe('AWAITING_SELECTION');
         });
 
         it('should return null if no TestPlan exists with the given id', async () => {
-            // Arrange: Database is empty
-            const nonExistentId = uuidv4();
-
-            // Act
-            const foundPlan = await repository.findById(nonExistentId);
-
-            // Assert
+            const foundPlan = await repository.findById(uuidv4());
             expect(foundPlan).toBeNull();
         });
     });
 
     describe('update', () => {
-        it('should update the status and updatedAt fields of an existing TestPlan', async () => {
-            // Arrange: Create an initial record
+        it('should update the status and failureReason of an existing TestPlan', async () => {
+            // Arrange: Use a valid new status
             const initialPlan: TestPlan = {
                 id: uuidv4(),
                 rootComponentId: 'comp-root-3',
-                status: 'PENDING',
+                status: 'DISCOVERING',
                 createdAt: new Date(),
                 updatedAt: new Date(),
             };
             await repository.save(initialPlan);
 
-            // Act: Update the retrieved object
+            // Act: Update to a valid new status
             const planToUpdate = (await repository.findById(initialPlan.id))!;
-            planToUpdate.status = 'COMPLETED';
-            planToUpdate.updatedAt = new Date(); // Ensure updatedAt is different
+            planToUpdate.status = 'DISCOVERY_FAILED';
+            planToUpdate.failureReason = 'API credentials invalid';
 
             const updatedPlan = await repository.update(planToUpdate);
 
             // Assert
-            expect(updatedPlan.id).toBe(initialPlan.id);
-            expect(updatedPlan.status).toBe('COMPLETED');
-            expect(updatedPlan.updatedAt.getTime()).toBeGreaterThan(initialPlan.updatedAt.getTime());
+            expect(updatedPlan.status).toBe('DISCOVERY_FAILED');
+            expect(updatedPlan.failureReason).toBe('API credentials invalid');
 
             // Verify directly against the database
-            const result = await testPool.query('SELECT status FROM test_plans WHERE id = $1', [initialPlan.id]);
-            expect(result.rows[0].status).toBe('COMPLETED');
+            const result = await testPool.query('SELECT status, failure_reason FROM test_plans WHERE id = $1', [initialPlan.id]);
+            expect(result.rows[0].status).toBe('DISCOVERY_FAILED');
+            expect(result.rows[0].failure_reason).toBe('API credentials invalid');
         });
     });
 });

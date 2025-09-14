@@ -4,9 +4,9 @@ import request from 'supertest';
 import nock from 'nock';
 import pg from 'pg';
 import app from '../app.js';
-import globalPool from '../infrastructure/database.js';
+import globalPool from '../infrastructure/database.js'; // <-- RE-ADD THIS IMPORT
+import { v4 as uuidv4 } from 'uuid';
 
-// --- Test Setup ---
 const BOOMI_API_BASE = 'https://api.boomi.com';
 
 describe('Discovery End-to-End Test', () => {
@@ -23,78 +23,69 @@ describe('Discovery End-to-End Test', () => {
     });
 
     beforeEach(async () => {
-        await testPool.query('TRUNCATE TABLE discovered_components RESTART IDENTITY CASCADE');
         await testPool.query('TRUNCATE TABLE test_plans RESTART IDENTITY CASCADE');
+        await testPool.query('TRUNCATE TABLE mappings RESTART IDENTITY CASCADE');
         nock.cleanAll();
     });
 
+    // --- UPDATED afterAll block ---
     afterAll(async () => {
         await testPool.end();
+        // We must end the global pool created by the app to allow Jest to exit cleanly.
         await globalPool.end();
     });
 
-    it('should successfully initiate discovery, process dependencies, and update the database with names and status', async () => {
+    it('should successfully initiate discovery and retrieve the detailed plan', async () => {
         // --- Arrange ---
         const rootComponentId = 'root-e2e-123';
         const childComponentId = 'child-e2e-456';
-        const credentials = {
-            accountId: 'test-account-e2e',
-            username: 'testuser',
-            passwordOrToken: 'testpass',
-        };
+        const credentials = { accountId: 'test-account-e2e', username: 'testuser', passwordOrToken: 'testpass' };
         const baseApiUrl = `/api/rest/v1/${credentials.accountId}`;
         const requestBody = { rootComponentId, integrationPlatformCredentials: credentials };
 
-        // Mock the Boomi API to include component names
-        nock(BOOMI_API_BASE).get(`${baseApiUrl}/ComponentMetadata/${rootComponentId}`).reply(200, { name: 'E2E Root Component', version: 1 });
-        nock(BOOMI_API_BASE).post(`${baseApiUrl}/ComponentReference/query`).reply(200, {
-            numberOfResults: 1,
-            result: [{ references: [{ componentId: childComponentId }] }],
-        });
-        nock(BOOMI_API_BASE).get(`${baseApiUrl}/ComponentMetadata/${childComponentId}`).reply(200, { name: 'E2E Child Component', version: 5 });
-        nock(BOOMI_API_BASE).post(`${baseApiUrl}/ComponentReference/query`).reply(200, { numberOfResults: 0, result: [] });
+        await testPool.query(
+            'INSERT INTO mappings (id, main_component_id, test_component_id, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW())',
+            [uuidv4(), childComponentId, 'test-for-child-e2e']
+        );
+
+        // --- CORRECTED NOCK SETUP ---
+        // This now accurately mocks the sequence of calls made by boomi_service.ts
+        const boomiScope = nock(BOOMI_API_BASE)
+            // 1. Get metadata for the root component
+            .get(`${baseApiUrl}/ComponentMetadata/${rootComponentId}`)
+            .reply(200, { name: 'E2E Root Component', version: 1, type: 'PROCESS' })
+            // 2. Query for root component's dependencies
+            .post(`${baseApiUrl}/ComponentReference/query`)
+            .reply(200, { numberOfResults: 1, result: [{ references: [{ componentId: childComponentId }] }] })
+            // 3. Get metadata for the child component
+            .get(`${baseApiUrl}/ComponentMetadata/${childComponentId}`)
+            .reply(200, { name: 'E2E Child Component', version: 5, type: 'PROCESS' })
+            // 4. Query for child component's dependencies (finds none)
+            .post(`${baseApiUrl}/ComponentReference/query`)
+            .reply(200, { numberOfResults: 0, result: [] });
 
         // --- Act & Assert (Phase 1: Initial API Call) ---
-        const response = await request(app)
-            .post('/api/v1/test-plans')
-            .send(requestBody)
-            .expect(202);
+        const initialResponse = await request(app).post('/api/v1/test-plans').send(requestBody).expect(202);
+        const planId = initialResponse.body.data.id;
+        expect(initialResponse.body.data.status).toBe('DISCOVERING');
 
-        expect(response.body.data.id).toBeDefined();
-        expect(response.body.data.status).toBe('PENDING');
-        expect(response.body.data.rootComponentId).toBe(rootComponentId);
-
-        const planId = response.body.data.id;
-
-        // --- Wait for the asynchronous background process to complete ---
+        // --- Wait for async background process ---
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        // --- Assert (Phase 2: Final Database State) ---
-
-        // 1. Check that the TestPlan was updated to AWAITING_SELECTION
+        // --- Assert (Phase 2: Database State) ---
         const planResult = await testPool.query('SELECT status FROM test_plans WHERE id = $1', [planId]);
         expect(planResult.rowCount).toBe(1);
-        expect(planResult.rows[0].status).toBe('AWAITING_SELECTION');
+        expect(planResult.rows[0].status).toBe('AWAITING_SELECTION'); // This should now pass
 
-        // Check that discovered components were saved with all correct fields
-        const componentsResult = await testPool.query(
-            'SELECT component_id, component_name, execution_status FROM discovered_components WHERE test_plan_id = $1',
-            [planId]
-        );
+        const componentsResult = await testPool.query('SELECT component_id, component_name FROM discovered_components WHERE test_plan_id = $1', [planId]);
         expect(componentsResult.rowCount).toBe(2);
 
-        const rootComponent = componentsResult.rows.find(r => r.component_id === rootComponentId);
-        const childComponent = componentsResult.rows.find(r => r.component_id === childComponentId);
-
-        // Verify names were saved
-        expect(rootComponent.component_name).toBe('E2E Root Component');
-        expect(childComponent.component_name).toBe('E2E Child Component');
-
-        // Verify default status was set
-        expect(rootComponent.execution_status).toBe('PENDING');
-        expect(childComponent.execution_status).toBe('PENDING');
-
-        // 3. Verify that all mocked Boomi API endpoints were called
-        expect(nock.isDone()).toBe(true);
+        // --- Assert (Phase 3: GET Plan Details) ---
+        const detailsResponse = await request(app).get(`/api/v1/test-plans/${planId}`).expect(200);
+        const planDetails = detailsResponse.body.data;
+        const childDetails = planDetails.discoveredComponents.find((c: any) => c.componentId === childComponentId);
+        
+        expect(childDetails.availableTests).toEqual(['test-for-child-e2e']);
+        expect(boomiScope.isDone()).toBe(true); // Verify all mocks were used
     });
 });

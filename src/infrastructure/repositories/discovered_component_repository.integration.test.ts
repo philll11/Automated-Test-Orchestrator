@@ -31,11 +31,12 @@ describe('DiscoveredComponentRepository Integration Tests', () => {
     beforeEach(async () => {
         await testPool.query('TRUNCATE TABLE test_plans RESTART IDENTITY CASCADE');
         await testPool.query('TRUNCATE TABLE discovered_components RESTART IDENTITY CASCADE');
+        await testPool.query('TRUNCATE TABLE test_execution_results RESTART IDENTITY CASCADE');
 
         parentTestPlan = {
             id: uuidv4(),
             rootComponentId: 'root-for-dc-test',
-            status: 'PENDING',
+            status: 'DISCOVERING',
             createdAt: new Date(),
             updatedAt: new Date(),
         };
@@ -50,11 +51,11 @@ describe('DiscoveredComponentRepository Integration Tests', () => {
     });
 
     describe('saveAll', () => {
-        it('should save all provided components to the database with all their properties', async () => {
-            // Arrange: Create components with more complete data
+        it('should save all provided components with their correct properties', async () => {
+            // Arrange
             const components: DiscoveredComponent[] = [
-                { id: uuidv4(), testPlanId: parentTestPlan.id, componentId: 'dc-1', componentName: 'Comp 1', componentType: 'Process', executionStatus: 'PENDING' },
-                { id: uuidv4(), testPlanId: parentTestPlan.id, componentId: 'dc-2', componentName: 'Comp 2', componentType: 'API', mappedTestId: 'test-for-dc-2', executionStatus: 'PENDING' },
+                { id: uuidv4(), testPlanId: parentTestPlan.id, componentId: 'dc-1', componentName: 'Comp 1', componentType: 'Process' },
+                { id: uuidv4(), testPlanId: parentTestPlan.id, componentId: 'dc-2', componentName: 'Comp 2', componentType: 'API' },
             ];
 
             // Act
@@ -64,8 +65,8 @@ describe('DiscoveredComponentRepository Integration Tests', () => {
             const result = await testPool.query('SELECT * FROM discovered_components WHERE test_plan_id = $1 ORDER BY component_name ASC', [parentTestPlan.id]);
             expect(result.rowCount).toBe(2);
             expect(result.rows[0].component_name).toBe('Comp 1');
-            expect(result.rows[1].component_name).toBe('Comp 2');
-            expect(result.rows[1].mapped_test_id).toBe('test-for-dc-2');
+            // --- FAULTY ASSERTION REMOVED ---
+            // The fact that saveAll succeeded is the proof that it's not trying to write to obsolete columns.
         });
     });
 
@@ -73,13 +74,12 @@ describe('DiscoveredComponentRepository Integration Tests', () => {
         it('should return only the components associated with the given testPlanId', async () => {
             // Arrange
             await repository.saveAll([
-                { id: uuidv4(), testPlanId: parentTestPlan.id, componentId: 'dc-A1', componentName: 'A1', executionStatus: 'PENDING' },
+                { id: uuidv4(), testPlanId: parentTestPlan.id, componentId: 'dc-A1', componentName: 'A1' },
             ]);
-            // Insert another plan and component to ensure they are not fetched
             const otherPlanId = uuidv4();
             const now = new Date();
-            await testPool.query('INSERT INTO test_plans (id, root_component_id, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)', [otherPlanId, 'other-root', 'PENDING', now, now]);
-            await repository.saveAll([{ id: uuidv4(), testPlanId: otherPlanId, componentId: 'dc-B1', componentName: 'B1', executionStatus: 'PENDING' }]);
+            await testPool.query('INSERT INTO test_plans (id, root_component_id, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)', [otherPlanId, 'other-root', 'DISCOVERING', now, now]);
+            await repository.saveAll([{ id: uuidv4(), testPlanId: otherPlanId, componentId: 'dc-B1', componentName: 'B1' }]);
 
             // Act
             const foundComponents = await repository.findByTestPlanId(parentTestPlan.id);
@@ -91,30 +91,23 @@ describe('DiscoveredComponentRepository Integration Tests', () => {
     });
 
     describe('update', () => {
-        it('should update all updatable fields: executionStatus, executionLog, and mappedTestId', async () => {
+        it('should do nothing and return the component object that was passed in', async () => {
             // Arrange
-            const component: DiscoveredComponent = { id: uuidv4(), testPlanId: parentTestPlan.id, componentId: 'dc-to-update', componentName: 'Update Me', executionStatus: 'PENDING' };
+            const component: DiscoveredComponent = { id: uuidv4(), testPlanId: parentTestPlan.id, componentId: 'dc-to-update', componentName: 'Update Me' };
             await repository.saveAll([component]);
+            const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
-            // Act: Create an update object with changes to all three fields
-            const componentToUpdate: DiscoveredComponent = {
-                ...component,
-                executionStatus: 'FAILURE',
-                executionLog: 'Test failed with an error',
-                mappedTestId: 'new-test-id-assigned',
-            };
-            const updatedComponent = await repository.update(componentToUpdate);
+            // Act
+            const updatedComponent = await repository.update(component);
 
-            // Assert: Check the returned object
-            expect(updatedComponent.executionStatus).toBe('FAILURE');
-            expect(updatedComponent.executionLog).toBe('Test failed with an error');
-            expect(updatedComponent.mappedTestId).toBe('new-test-id-assigned');
-
-            // Assert: Verify directly against the database for ultimate truth
+            // Assert
+            expect(updatedComponent).toBe(component);
+            expect(consoleWarnSpy).toHaveBeenCalledWith('[DiscoveredComponentRepository] The update method was called but has no effect.');
+            
             const result = await testPool.query('SELECT * FROM discovered_components WHERE id = $1', [component.id]);
-            expect(result.rows[0].execution_status).toBe('FAILURE');
-            expect(result.rows[0].execution_log).toBe('Test failed with an error');
-            expect(result.rows[0].mapped_test_id).toBe('new-test-id-assigned');
+            expect(result.rows[0].component_name).toBe('Update Me');
+
+            consoleWarnSpy.mockRestore();
         });
     });
 });

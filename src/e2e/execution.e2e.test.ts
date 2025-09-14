@@ -6,19 +6,12 @@ import pg from 'pg';
 import { v4 as uuidv4 } from 'uuid';
 import app from '../app.js';
 import globalPool from '../infrastructure/database.js';
-import { TestPlan } from '../domain/test_plan.js';
-import { DiscoveredComponent } from '../domain/discovered_component.js';
 
-// --- Test Setup ---
 const BOOMI_API_BASE = 'https://api.boomi.com';
 
 describe('Execution End-to-End Test', () => {
     let testPool: pg.Pool;
-    const credentials = {
-        accountId: 'test-account-e2e',
-        username: 'testuser',
-        passwordOrToken: 'testpass',
-    };
+    const credentials = { accountId: 'test-account-e2e', username: 'testuser', passwordOrToken: 'testpass' };
     const executionInstanceId = 'test-atom-e2e';
     const baseApiUrl = `/api/rest/v1/${credentials.accountId}`;
 
@@ -33,7 +26,6 @@ describe('Execution End-to-End Test', () => {
     });
 
     beforeEach(async () => {
-        await testPool.query('TRUNCATE TABLE discovered_components RESTART IDENTITY CASCADE');
         await testPool.query('TRUNCATE TABLE test_plans RESTART IDENTITY CASCADE');
         nock.cleanAll();
     });
@@ -43,95 +35,55 @@ describe('Execution End-to-End Test', () => {
         await globalPool.end();
     });
 
-    it('should successfully execute selected tests and update the database state', async () => {
-        // --- Arrange (1): Set up the initial database state ---
+    it('should execute a successful test, create a result record, and mark the plan as COMPLETED', async () => {
+        // --- Arrange (1): Seed the database ---
         const planId = uuidv4();
-        const testPlan: TestPlan = {
-            id: planId,
-            rootComponentId: 'root-e2e-exec',
-            status: 'AWAITING_SELECTION',
-            createdAt: new Date(),
-            updatedAt: new Date(),
-        };
-        await testPool.query(
-            `INSERT INTO test_plans (id, root_component_id, status, created_at, updated_at) 
-             VALUES ($1, $2, $3, $4, $5)`,
-            [planId, testPlan.rootComponentId, testPlan.status, testPlan.createdAt, testPlan.updatedAt]
-        );
+        await testPool.query(`INSERT INTO test_plans (id, root_component_id, status, created_at, updated_at) VALUES ($1, 'root', 'AWAITING_SELECTION', NOW(), NOW())`, [planId]);
+        
+        const discoveredComponentId = uuidv4();
+        await testPool.query(`INSERT INTO discovered_components (id, test_plan_id, component_id, component_name) VALUES ($1, $2, 'comp-abc', 'Component to Test')`, [discoveredComponentId, planId]);
+        
+        const testToRun = 'test-abc-123';
+        await testPool.query(`INSERT INTO mappings (id, main_component_id, test_component_id, created_at, updated_at) VALUES ($1, 'comp-abc', $2, NOW(), NOW())`, [uuidv4(), testToRun]);
 
-        // Updated DiscoveredComponent objects to match the full domain model
-        const componentToTest: DiscoveredComponent = {
-            id: uuidv4(),
-            testPlanId: planId,
-            componentId: 'comp-abc',
-            componentName: 'Component to Test',
-            componentType: 'process',
-            mappedTestId: 'test-abc-123',
-            executionStatus: 'PENDING', // Set the correct initial state
-        };
-        const componentToIgnore: DiscoveredComponent = {
-            id: uuidv4(),
-            testPlanId: planId,
-            componentId: 'comp-def',
-            componentName: 'Component to Ignore',
-            componentType: 'process',
-            mappedTestId: 'test-def-456',
-            executionStatus: 'PENDING', // Set the correct initial state
-        };
-
-        // Updated INSERT query to include the new columns
-        await testPool.query(
-            `INSERT INTO discovered_components (id, test_plan_id, component_id, component_name, component_type, mapped_test_id, execution_status) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7), ($8, $9, $10, $11, $12, $13, $14)`,
-            [
-                componentToTest.id, planId, componentToTest.componentId, componentToTest.componentName, componentToTest.componentType, componentToTest.mappedTestId, componentToTest.executionStatus,
-                componentToIgnore.id, planId, componentToIgnore.componentId, componentToIgnore.componentName, componentToIgnore.componentType, componentToIgnore.mappedTestId, componentToIgnore.executionStatus
-            ]
-        );
-
-        // --- Arrange (2): Mock the Boomi API execution sequence ---
+        // --- Arrange (2): Mock the Boomi API ---
         const requestId = 'execution-e2e-success-123';
         const recordUrl = 'https://platform.boomi.com/log/e2e-success-123';
 
-        nock(BOOMI_API_BASE).post(`${baseApiUrl}/ExecutionRequest`).reply(200, { requestId, recordUrl });
-        nock(BOOMI_API_BASE).get(`${baseApiUrl}/ExecutionRecord/async/${requestId}`).reply(200, {
-            responseStatusCode: 200,
-            result: [{ status: 'COMPLETE' }],
-        });
+        const boomiScope = nock(BOOMI_API_BASE)
+            .post(`${baseApiUrl}/ExecutionRequest`).reply(200, { requestId, recordUrl })
+            .get(`${baseApiUrl}/ExecutionRecord/async/${requestId}`).reply(200, { responseStatusCode: 200, result: [{ status: 'COMPLETE' }] });
 
-        // --- Act & Assert (Phase 1: Initial API Call) ---
-        const response = await request(app)
+        // --- Act ---
+        await request(app)
             .post(`/api/v1/test-plans/${planId}/execute`)
             .send({
-                testsToRun: [componentToTest.mappedTestId],
-                boomiCredentials: credentials,
+                testsToRun: [testToRun],
+                integrationPlatformCredentials: credentials, // <-- CORRECTED PROPERTY NAME
                 executionInstanceId: executionInstanceId,
             })
             .expect(202);
-
-        expect(response.body.metadata.message).toBe('Execution initiated');
-
-        // --- Wait for the asynchronous background process to complete ---
+        
+        // --- Wait for the asynchronous process to complete ---
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        // --- Assert (Phase 2: Final Database State) ---
+        // --- Assert Final State ---
+        // 1. The TestPlan should be COMPLETED
+        const finalPlanResult = await testPool.query('SELECT status FROM test_plans WHERE id = $1', [planId]);
+        expect(finalPlanResult.rows[0].status).toBe('COMPLETED'); // <-- This is the most important assertion
 
-        // 1. Check that the TestPlan was updated to COMPLETED
-        const planResult = await testPool.query('SELECT status FROM test_plans WHERE id = $1', [planId]);
-        expect(planResult.rowCount).toBe(1);
-        expect(planResult.rows[0].status).toBe('COMPLETED');
+        // 2. A new record should exist in test_execution_results
+        const resultsResult = await testPool.query('SELECT * FROM test_execution_results WHERE discovered_component_id = $1', [discoveredComponentId]);
+        expect(resultsResult.rowCount).toBe(1);
+        expect(resultsResult.rows[0].status).toBe('SUCCESS');
 
-        // 2. Check that the EXECUTED component was updated to SUCCESS
-        const testedCompResult = await testPool.query('SELECT execution_status FROM discovered_components WHERE id = $1', [componentToTest.id]);
-        expect(testedCompResult.rowCount).toBe(1);
-        expect(testedCompResult.rows[0].execution_status).toBe('SUCCESS');
+        // 3. Verify all mocks were used
+        expect(boomiScope.isDone()).toBe(true);
 
-        // Check that the IGNORED component's status remained PENDING
-        const ignoredCompResult = await testPool.query('SELECT execution_status FROM discovered_components WHERE id = $1', [componentToIgnore.id]);
-        expect(ignoredCompResult.rowCount).toBe(1);
-        expect(ignoredCompResult.rows[0].execution_status).toBe('PENDING');
-
-        // 4. Verify that all mocked Boomi API endpoints were called
-        expect(nock.isDone()).toBe(true);
+        // 4. GET endpoint should now show the result
+        const detailsResponse = await request(app).get(`/api/v1/test-plans/${planId}`).expect(200);
+        const componentDetails = detailsResponse.body.data.discoveredComponents[0];
+        expect(componentDetails.executionResults).toHaveLength(1);
+        expect(componentDetails.executionResults[0].status).toBe('SUCCESS');
     });
 });

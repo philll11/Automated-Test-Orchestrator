@@ -6,7 +6,4 @@ export interface DiscoveredComponent {
   componentId: string;
   componentName?: string;
   componentType?: string;
-  mappedTestId?: string;
-  executionStatus?: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILURE';
-  executionLog?: string;
 }

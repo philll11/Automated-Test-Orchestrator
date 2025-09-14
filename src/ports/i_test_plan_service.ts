@@ -2,10 +2,16 @@
 
 import { TestPlan } from "../domain/test_plan.js";
 import { DiscoveredComponent } from '../domain/discovered_component.js';
-import { IIntegrationPlatformService } from "./i_integration_platform_service.js"; 
+import { IIntegrationPlatformService } from "./i_integration_platform_service.js";
+import { TestExecutionResult } from "../domain/test_execution_result.js";
 
-export type TestPlanWithComponents = TestPlan & {
-  discoveredComponents: DiscoveredComponent[];
+export type DiscoveredComponentDetails = DiscoveredComponent & {
+  availableTests: string[];
+  executionResults: TestExecutionResult[];
+};
+
+export type TestPlanWithDetails = TestPlan & {
+  discoveredComponents: DiscoveredComponentDetails[];
 };
 
 export interface ITestPlanService {
@@ -14,7 +20,7 @@ export interface ITestPlanService {
    * @param planId The ID of the test plan to retrieve.
    * @returns The complete test plan with components, or null if not found.
    */
-  getPlanWithDetails(planId: string): Promise<TestPlanWithComponents | null>;
+  getPlanWithDetails(planId: string): Promise<TestPlanWithDetails | null>;
 
   /**
    * Initiates the asynchronous discovery of a component's dependency tree.

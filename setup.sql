@@ -15,22 +15,46 @@ CREATE TABLE test_plans (
 -- Stores individual components discovered during dependency analysis for a given test plan.
 CREATE TABLE discovered_components (
     id UUID PRIMARY KEY,
-    test_plan_id UUID NOT NULL REFERENCES test_plans(id),
+    test_plan_id UUID NOT NULL,
     component_id VARCHAR(255) NOT NULL,
     component_name VARCHAR(255),
-    component_type VARCHAR(100),
-    mapped_test_id VARCHAR(255),
+    component_type VARCHAR(255),
     execution_status VARCHAR(50),
-    execution_log TEXT
+    execution_log TEXT,
+    CONSTRAINT fk_test_plan
+        FOREIGN KEY(test_plan_id)
+        REFERENCES test_plans(id)
+        ON DELETE CASCADE
 );
 
--- Table: component_test_mappings
+-- Table: mappings
 -- A persistent lookup table that maps a production component to its corresponding test component.
-CREATE TABLE component_test_mappings (
-    main_component_id VARCHAR(255) PRIMARY KEY,
+CREATE TABLE mappings (
+    id UUID PRIMARY KEY,
+    main_component_id VARCHAR(255) NOT NULL,
     test_component_id VARCHAR(255) NOT NULL,
+    test_component_name VARCHAR(255),
+    is_deployed BOOLEAN DEFAULT FALSE,
+    is_package BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL
+);
+
+--
+-- Table: test_execution_results
+-- Stores the result of each individual test run
+--
+CREATE TABLE test_execution_results (
+    id UUID PRIMARY KEY,
+    discovered_component_id UUID NOT NULL,
+    test_component_id VARCHAR(255) NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    log TEXT,
+    executed_at TIMESTAMP NOT NULL,
+    CONSTRAINT fk_discovered_component
+        FOREIGN KEY(discovered_component_id)
+        REFERENCES discovered_components(id)
+        ON DELETE CASCADE
 );
 
 -- Optional: Add indexes for performance

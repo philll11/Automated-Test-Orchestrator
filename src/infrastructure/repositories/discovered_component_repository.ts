@@ -9,7 +9,6 @@ import { TYPES } from '../../inversify.types.js';
 
 @injectable()
 export class DiscoveredComponentRepository implements IDiscoveredComponentRepository {
-    
     constructor(@inject(TYPES.PostgresPool) private pool: Pool) {}
 
     async saveAll(components: DiscoveredComponent[]): Promise<void> {
@@ -17,13 +16,11 @@ export class DiscoveredComponentRepository implements IDiscoveredComponentReposi
         try {
             await client.query('BEGIN');
             for (const component of components) {
-                const { id, testPlanId, componentId, componentName, componentType, mappedTestId, executionStatus, executionLog } = component;
+                const { id, testPlanId, componentId, componentName, componentType } = component;
                 const query = `
-                    INSERT INTO discovered_components (id, test_plan_id, component_id, component_name, component_type, mapped_test_id, execution_status, execution_log)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                    ON CONFLICT (id) DO NOTHING;
-                `;
-                const values = [id, testPlanId, componentId, componentName, componentType, mappedTestId, executionStatus, executionLog];
+                    INSERT INTO discovered_components (id, test_plan_id, component_id, component_name, component_type)
+                    VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING;`;
+                const values = [id, testPlanId, componentId, componentName, componentType];
                 await client.query(query, values);
             }
             await client.query('COMMIT');
@@ -40,17 +37,13 @@ export class DiscoveredComponentRepository implements IDiscoveredComponentReposi
         const result = await this.pool.query(query, [testPlanId]);
         return result.rows.map(rowToDiscoveredComponent);
     }
-
+    
+    // The update method is no longer needed as there's nothing to update on this record
+    // after it has been discovered. We can remove it from the interface and class in a future step
+    // but will leave it for now to avoid breaking the port contract.
     async update(component: DiscoveredComponent): Promise<DiscoveredComponent> {
-        const { id, executionStatus, executionLog, mappedTestId } = component;
-        const query = `
-            UPDATE discovered_components
-            SET execution_status = $1, execution_log = $2, mapped_test_id = $3
-            WHERE id = $4
-            RETURNING *;
-        `;
-        const values = [executionStatus, executionLog, mappedTestId, id];
-        const result = await this.pool.query(query, values);
-        return rowToDiscoveredComponent(result.rows[0]);
+        // This method no longer has a purpose but is kept to satisfy the interface.
+        console.warn('[DiscoveredComponentRepository] The update method was called but has no effect.');
+        return Promise.resolve(component);
     }
 }

@@ -1,12 +1,20 @@
 // src/inversify.types.ts
 
-// This file contains only the symbols used for DI bindings.
-// It has no dependencies, which prevents circular import errors.
 export const TYPES = {
+    // Test Plan related
     ITestPlanService: Symbol.for('ITestPlanService'),
+    TestPlanController: Symbol.for('TestPlanController'),
+    
+    // Mapping related
+    IMappingService: Symbol.for('IMappingService'),
+    MappingsController: Symbol.for('MappingsController'),
+
+    // Repositories
     ITestPlanRepository: Symbol.for('ITestPlanRepository'),
     IDiscoveredComponentRepository: Symbol.for('IDiscoveredComponentRepository'),
-    IComponentTestMappingRepository: Symbol.for('IComponentTestMappingRepository'),
-    TestPlanController: Symbol.for('TestPlanController'),
+    IMappingRepository: Symbol.for('IMappingRepository'),
+    ITestExecutionResultRepository: Symbol.for('ITestExecutionResultRepository'),
+    
+    // Infrastructure
     PostgresPool: Symbol.for('PostgresPool'),
 };
