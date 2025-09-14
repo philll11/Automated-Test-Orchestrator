@@ -1,17 +1,16 @@
 // src/infrastructure/repositories/discovered_component_repository.ts
 
-import pg from 'pg';
+import { Pool } from 'pg';
+import { injectable, inject } from 'inversify';
 import { IDiscoveredComponentRepository } from "../../ports/i_discovered_component_repository.js";
 import { DiscoveredComponent } from "../../domain/discovered_component.js";
-import globalPool from "../database.js";
 import { rowToDiscoveredComponent } from "../mappers.js";
+import { TYPES } from '../../inversify.types.js';
 
+@injectable()
 export class DiscoveredComponentRepository implements IDiscoveredComponentRepository {
-    private pool: pg.Pool;
-
-    constructor(poolInstance: pg.Pool = globalPool) {
-        this.pool = poolInstance;
-    }
+    
+    constructor(@inject(TYPES.PostgresPool) private pool: Pool) {}
 
     async saveAll(components: DiscoveredComponent[]): Promise<void> {
         const client = await this.pool.connect();

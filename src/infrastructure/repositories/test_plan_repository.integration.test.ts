@@ -1,3 +1,5 @@
+// src/infrastructure/repositories/test_plan_repository.integration.test.ts
+
 import { TestPlanRepository } from './test_plan_repository';
 import globalPool from '../database'; 
 import { Pool } from 'pg';
@@ -17,13 +19,12 @@ describe('TestPlanRepository Integration Tests', () => {
     // Before any tests run, establish a connection.
     // The testPool connects lazily, so a simple query is a good way to verify the connection.
     beforeAll(async () => {
-        repository = new TestPlanRepository();
+        repository = new TestPlanRepository(testPool);
         try {
-            await testPool.query('SELECT NOW()'); // Verify connection
+            await testPool.query('SELECT NOW()');
             console.log('Test database connection successful.');
         } catch (error) {
             console.error('Test database connection failed:', error);
-            // Fail the whole suite if the DB isn't available
             throw error;
         }
     });

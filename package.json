@@ -12,7 +12,10 @@
     "dev": "node --loader ts-node/esm src/index.ts",
     "test": "jest --verbose",
     "test:unit": "jest --testMatch=\"**/*.unit.test.ts\" --verbose",
-    "test:int": "jest --testMatch=\"**/*.integration.test.ts\" --verbose",
+    "test:int:component": "jest --testMatch=\"**/component_test_mapping_repository.integration.test.ts\" --verbose",
+    "test:int:discovery": "jest --testMatch=\"**/discovered_component_repository.integration.test.ts\" --verbose",
+    "test:int:test_plan": "jest --testMatch=\"**/test_plan_repository.integration.test.ts\" --verbose",
+    "test:int:all": "npm run test:int:test_plan && npm run test:int:component && npm run test:int:discovery",
     "test:e2e:discover": "jest --testMatch=\"**/discovery.e2e.test.ts\" --verbose",
     "test:e2e:execute": "jest --testMatch=\"**/execution.e2e.test.ts\" --verbose",
     "test:e2e:live": "jest --testMatch=\"**/live_system.e2e.test.ts\" --verbose",
@@ -51,9 +54,11 @@
     "commander": "12.1.0",
     "express": "4.19.2",
     "inquirer": "12.9.4",
+    "inversify": "7.9.1",
     "keytar": "7.9.0",
     "ora": "8.2.0",
     "pg": "8.12.0",
+    "reflect-metadata": "0.2.2",
     "swagger-jsdoc": "6.2.8",
     "swagger-ui-express": "5.0.1"
   }

@@ -1,17 +1,16 @@
 // src/infrastructure/repositories/component_test_mapping_repository.ts
 
-import pg from 'pg';
+import { Pool } from 'pg';
+import { injectable, inject } from 'inversify';
 import { IComponentTestMappingRepository } from "../../ports/i_component_test_mapping_repository.js";
 import { ComponentTestMapping } from "../../domain/component_test_mapping.js";
-import globalPool from "../database.js";
 import { rowToComponentTestMapping } from "../mappers.js";
+import { TYPES } from '../../inversify.types.js';
 
+@injectable()
 export class ComponentTestMappingRepository implements IComponentTestMappingRepository {
-    private pool: pg.Pool;
-
-    constructor(poolInstance: pg.Pool = globalPool) {
-        this.pool = poolInstance;
-    }
+    constructor(@inject(TYPES.PostgresPool) private pool: Pool) {}
+    
     async findTestMapping(mainComponentId: string): Promise<ComponentTestMapping | null> {
         const query = 'SELECT * FROM component_test_mappings WHERE main_component_id = $1;';
         const result = await this.pool.query(query, [mainComponentId]);

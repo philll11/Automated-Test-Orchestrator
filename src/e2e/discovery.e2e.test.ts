@@ -1,3 +1,5 @@
+// src/e2e/discovery.e2e.test.ts
+
 import request from 'supertest';
 import nock from 'nock';
 import pg from 'pg';
@@ -41,7 +43,7 @@ describe('Discovery End-to-End Test', () => {
             passwordOrToken: 'testpass',
         };
         const baseApiUrl = `/api/rest/v1/${credentials.accountId}`;
-        const requestBody = { rootComponentId, boomiCredentials: credentials };
+        const requestBody = { rootComponentId, integrationPlatformCredentials: credentials };
 
         // Mock the Boomi API to include component names
         nock(BOOMI_API_BASE).get(`${baseApiUrl}/ComponentMetadata/${rootComponentId}`).reply(200, { name: 'E2E Root Component', version: 1 });

@@ -1,18 +1,16 @@
 // src/infrastructure/repositories/test_plan_repository.ts
 
-import pg from 'pg';
+import { Pool } from 'pg';
+import { injectable, inject } from 'inversify';
 import { ITestPlanRepository } from "../../ports/i_test_plan_repository.js";
 import { TestPlan } from "../../domain/test_plan.js";
-import globalPool from "../database.js";
 import { rowToTestPlan } from "../mappers.js";
+import { TYPES } from '../../inversify.types.js';
 
-
+@injectable()
 export class TestPlanRepository implements ITestPlanRepository {
-    private pool: pg.Pool;
-
-    constructor(poolInstance: pg.Pool = globalPool) {
-        this.pool = poolInstance;
-    }
+    
+    constructor(@inject(TYPES.PostgresPool) private pool: Pool) {}
 
     async save(testPlan: TestPlan): Promise<TestPlan> {
         const { id, rootComponentId, status, createdAt, updatedAt } = testPlan;
