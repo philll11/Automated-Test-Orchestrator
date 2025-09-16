@@ -57,7 +57,9 @@ export function rowToMapping(row: any): Mapping {
   };
 }
 
-/** * Maps a raw database row from the 'test_execution_results' table to a TestExecutionResult domain object.
+/**
+ * Maps a raw database row from the 'test_execution_results' table to a TestExecutionResult domain object.
+ * This function expects a row that has been joined with other tables to include additional names.
  * @param row The raw row object from the database (snake_case).
  * @returns A TestExecutionResult object (camelCase).
  */
@@ -65,8 +67,12 @@ export function rowToTestExecutionResult(row: any): TestExecutionResult {
   if (!row) return row;
   return {
     id: row.id,
+    testPlanId: row.test_plan_id,
+    rootComponentId: row.root_component_id,
     discoveredComponentId: row.discovered_component_id,
+    componentName: row.component_name,
     testComponentId: row.test_component_id,
+    testComponentName: row.test_component_name,
     status: row.status,
     log: row.log,
     executedAt: row.executed_at,

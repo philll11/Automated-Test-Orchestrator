@@ -156,6 +156,7 @@ export class TestPlanService implements ITestPlanService {
                 const result = await integrationPlatformService.executeTestProcess(testId);
 
                 await this.testExecutionResultRepository.save({
+                    testPlanId: planId,
                     discoveredComponentId: discoveredComponent.id,
                     testComponentId: testId,
                     status: result.status,

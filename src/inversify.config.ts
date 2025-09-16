@@ -10,17 +10,20 @@ import { TYPES } from './inversify.types.js';
 import { TestPlanController } from './routes/test_plans.controller.js';
 import { MappingsController } from './routes/mappings.controller.js';
 import { CredentialsController } from './routes/credentials.controller.js';
+import { TestExecutionResultsController } from './routes/test_execution_results.controller.js';
 
 // Import Services
 import { TestPlanService } from './application/test_plan_service.js';
 import { MappingService } from './application/mapping_service.js';
 import { CredentialService } from './application/credential_service.js';
+import { TestExecutionResultService } from './application/test_execution_result_service.js';
 
 // Import Ports
 import { ICredentialService } from './ports/i_credential_service.js';
 import { ISecureCredentialService } from './ports/i_secure_credential_service.js';
 import { ITestPlanService } from './ports/i_test_plan_service.js';
 import { IMappingService } from './ports/i_mapping_service.js';
+import { ITestExecutionResultService } from './ports/i_test_execution_result_service.js';
 import { ITestPlanRepository } from './ports/i_test_plan_repository.js';
 import { IDiscoveredComponentRepository } from './ports/i_discovered_component_repository.js';
 import { IIntegrationPlatformServiceFactory } from './ports/i_integration_platform_service_factory.js';
@@ -47,6 +50,7 @@ container.bind<Pool>(TYPES.PostgresPool).toConstantValue(globalPool);
 container.bind<TestPlanController>(TYPES.TestPlanController).to(TestPlanController).inSingletonScope();
 container.bind<MappingsController>(TYPES.MappingsController).to(MappingsController).inSingletonScope();
 container.bind<CredentialsController>(TYPES.CredentialsController).to(CredentialsController).inSingletonScope();
+container.bind<TestExecutionResultsController>(TYPES.TestExecutionResultsController).to(TestExecutionResultsController).inSingletonScope();
 
 // --- Repository Bindings ---
 container.bind<ITestPlanRepository>(TYPES.ITestPlanRepository).to(TestPlanRepository).inSingletonScope();
@@ -58,6 +62,7 @@ container.bind<ITestExecutionResultRepository>(TYPES.ITestExecutionResultReposit
 container.bind<ITestPlanService>(TYPES.ITestPlanService).to(TestPlanService).inSingletonScope();
 container.bind<IMappingService>(TYPES.IMappingService).to(MappingService).inSingletonScope();
 container.bind<ICredentialService>(TYPES.ICredentialService).to(CredentialService).inSingletonScope();
+container.bind<ITestExecutionResultService>(TYPES.ITestExecutionResultService).to(TestExecutionResultService).inSingletonScope();
 
 // --- Infrastructure Adapter Bindings ---
 container.bind<ISecureCredentialService>(TYPES.ISecureCredentialService).to(InMemorySecureCredentialService).inSingletonScope();

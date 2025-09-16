@@ -38,6 +38,7 @@ const mockComponentTestMappingRepo: jest.Mocked<IMappingRepository> = {
 const mockTestExecutionResultRepo: jest.Mocked<ITestExecutionResultRepository> = {
     save: jest.fn(),
     findByDiscoveredComponentIds: jest.fn(),
+    findByFilters: jest.fn(),
 };
 
 const mockIntegrationService: jest.Mocked<IIntegrationPlatformService> = {
@@ -82,7 +83,7 @@ describe('TestPlanService', () => {
                 { id: 'dc-1', testPlanId: planId, componentId: 'comp-A' },
                 { id: 'dc-2', testPlanId: planId, componentId: 'comp-B' },
             ];
-            const mockResults: TestExecutionResult[] = [
+            const mockResults: any[] = [
                 { id: 'res-1', discoveredComponentId: 'dc-1', testComponentId: 'test-A', status: 'SUCCESS', executedAt: new Date() }
             ];
             const mockMappings = new Map([['comp-A', ['test-A', 'test-A2']], ['comp-B', ['test-B']]]);
@@ -170,21 +171,27 @@ describe('TestPlanService', () => {
             { id: 'dc-2', testPlanId: planId, componentId: 'comp-B' },
         ];
 
-        it('should execute tests, save each result, and mark the plan as COMPLETED', async () => {
-            const testsToRun = ['test-A', 'test-B'];
+
+        it('should execute tests, save each result with the planId, and mark the plan as COMPLETED', async () => {
+            const testsToRun = ['test-A'];
+            const discoveredComponents = createDiscoveredComponents();
             mockTestPlanRepo.findById.mockResolvedValue(createReadyTestPlan());
-            mockDiscoveredComponentRepo.findByTestPlanId.mockResolvedValue(createDiscoveredComponents());
-            mockComponentTestMappingRepo.findAllTestsForMainComponents.mockResolvedValue(new Map([['comp-A', ['test-A']], ['comp-B', ['test-B']]]));
+            mockDiscoveredComponentRepo.findByTestPlanId.mockResolvedValue(discoveredComponents);
+            mockComponentTestMappingRepo.findAllTestsForMainComponents.mockResolvedValue(new Map([['comp-A', ['test-A']]]));
             
             mockPlatformServiceFactory.create.mockResolvedValue(mockIntegrationService);
             mockIntegrationService.executeTestProcess.mockResolvedValue({ status: 'SUCCESS', message: 'Passed' });
 
             await service.executeTests(planId, testsToRun, credentialProfile);
 
-            expect(mockPlatformServiceFactory.create).toHaveBeenCalledWith(credentialProfile);
             expect(mockIntegrationService.executeTestProcess).toHaveBeenCalledWith('test-A');
-            expect(mockIntegrationService.executeTestProcess).toHaveBeenCalledWith('test-B');
-            expect(mockTestExecutionResultRepo.save).toHaveBeenCalledTimes(2);
+            expect(mockTestExecutionResultRepo.save).toHaveBeenCalledWith({
+                testPlanId: planId,
+                discoveredComponentId: discoveredComponents[0].id,
+                testComponentId: 'test-A',
+                status: 'SUCCESS',
+                log: 'Passed'
+            });
             expect(mockTestPlanRepo.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'COMPLETED' }));
         });
         

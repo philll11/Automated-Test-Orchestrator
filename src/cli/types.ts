@@ -63,3 +63,17 @@ export interface CliCredentialProfile {
   profileName: string;
   credentials: CliDisplayCredential;
 }
+
+// Represents a single, enriched result from the new query endpoint
+export interface CliEnrichedTestExecutionResult {
+  id: string;
+  testPlanId: string;
+  rootComponentId: string;
+  discoveredComponentId: string;
+  componentName?: string;
+  testComponentId: string;
+  testComponentName?: string;
+  status: 'SUCCESS' | 'FAILURE';
+  log?: string;
+  executedAt: string; // ISO date string
+}

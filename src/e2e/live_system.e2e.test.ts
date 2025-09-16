@@ -51,7 +51,7 @@ describe('Live System End-to-End Tests', () => {
 
     beforeEach(async () => {
         // Clean all tables before every test for perfect isolation
-        await testPool.query('TRUNCATE TABLE test_plans RESTART IDENTITY CASCADE');
+        await testPool.query('TRUNCATE TABLE test_plans, discovered_components, mappings, test_execution_results RESTART IDENTITY CASCADE');
     });
 
     afterAll(async () => {
@@ -151,5 +151,55 @@ describe('Live System End-to-End Tests', () => {
             expect(resultsDbResult.rowCount).toBe(1);
             expect(resultsDbResult.rows[0].status).toBe('SUCCESS');
         }, 50000); // Increased timeout for live API calls
+    });
+
+    describe('Results Querying Stage', () => {
+        let planId: string;
+        let discoveredComponentId: string;
+        const componentName = 'Live Test Component';
+        const testName = 'Live Test Mapping';
+
+        beforeEach(async () => {
+            await testPool.query('TRUNCATE TABLE mappings RESTART IDENTITY CASCADE');
+            // Seed a mapping with a name for enrichment testing
+            await testPool.query(
+                'INSERT INTO mappings (id, main_component_id, test_component_id, test_component_name, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW())',
+                [uuidv4(), rootComponentId, mappedTestId, testName]
+            );
+
+            // Seed a plan and a discovered component with a name
+            planId = uuidv4();
+            discoveredComponentId = uuidv4();
+            await testPool.query(`INSERT INTO test_plans (id, root_component_id, status, created_at, updated_at) VALUES ($1, $2, 'AWAITING_SELECTION', NOW(), NOW())`, [planId, rootComponentId]);
+            await testPool.query(`INSERT INTO discovered_components (id, test_plan_id, component_id, component_name) VALUES ($1, $2, $3, $4)`, [discoveredComponentId, planId, rootComponentId, componentName]);
+        });
+
+        it('should execute a test and then successfully query for its enriched result via the API', async () => {
+            // 1. Execute the test against the live Boomi API
+            await request(app)
+                .post(`/api/v1/test-plans/${planId}/execute`)
+                .send({ testsToRun: [mappedTestId], credentialProfile: liveTestProfileName })
+                .expect(202);
+
+            // 2. Poll for completion to ensure the result has been saved
+            await pollForStatus(planId, 'COMPLETED', 45000);
+
+            // 3. Query for the result using our new endpoint
+            const queryResponse = await request(app)
+                .get('/api/v1/test-execution-results')
+                .query({ testPlanId: planId })
+                .expect(200);
+
+            // 4. Assert the enriched data returned by the API is correct
+            expect(queryResponse.body).toHaveLength(1);
+            const result = queryResponse.body[0];
+
+            expect(result.testPlanId).toBe(planId);
+            expect(result.status).toBe('SUCCESS');
+            expect(result.discoveredComponentId).toBe(discoveredComponentId);
+            expect(result.componentName).toBe(componentName); // Verify enrichment
+            expect(result.testComponentName).toBe(testName); // Verify enrichment
+            expect(result.rootComponentId).toBe(rootComponentId); // Verify enrichment
+        }, 60000); // Generous timeout for the full E2E workflow
     });
 });

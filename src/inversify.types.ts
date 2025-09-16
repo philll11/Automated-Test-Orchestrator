@@ -13,6 +13,10 @@ export const TYPES = {
     ICredentialService: Symbol.for('ICredentialService'),
     CredentialsController: Symbol.for('CredentialsController'),
     ISecureCredentialService: Symbol.for('ISecureCredentialService'),
+
+    // Test Results
+    ITestExecutionResultService: Symbol.for('ITestExecutionResultService'),
+    TestExecutionResultsController: Symbol.for('TestExecutionResultsController'),
     
     // Repositories
     ITestPlanRepository: Symbol.for('ITestPlanRepository'),

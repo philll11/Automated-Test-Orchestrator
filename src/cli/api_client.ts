@@ -1,7 +1,7 @@
 // src/cli/api_client.ts
 
 import axios from 'axios';
-import type { CliTestPlan, CliMapping, CliCredentialProfile } from './types.js';
+import type { CliTestPlan, CliMapping, CliCredentialProfile, CliEnrichedTestExecutionResult  } from './types.js';
 import { config } from './config.js';
 
 const apiClient = axios.create({
@@ -147,4 +147,26 @@ export async function getAllMappings(): Promise<CliMapping[]> {
  */
 export async function deleteMapping(mappingId: string): Promise<void> {
     await apiClient.delete(`/mappings/${mappingId}`);
+}
+
+// --- TEST EXECUTION RESULTS FUNCTIONS ---
+
+/**
+ * The filter criteria for querying test execution results.
+ */
+export interface GetResultsFilters {
+  testPlanId?: string;
+  discoveredComponentId?: string;
+  testComponentId?: string;
+  status?: 'SUCCESS' | 'FAILURE';
+}
+
+/**
+ * Retrieves enriched test execution results from the backend based on filters.
+ * @param filters The query parameters to filter the results by.
+ * @returns An array of enriched test execution result objects.
+ */
+export async function getExecutionResults(filters: GetResultsFilters): Promise<CliEnrichedTestExecutionResult[]> {
+    const response = await apiClient.get('/test-execution-results', { params: filters });
+    return response.data;
 }

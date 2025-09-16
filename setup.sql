@@ -19,8 +19,6 @@ CREATE TABLE discovered_components (
     component_id VARCHAR(255) NOT NULL,
     component_name VARCHAR(255),
     component_type VARCHAR(255),
-    execution_status VARCHAR(50),
-    execution_log TEXT,
     CONSTRAINT fk_test_plan
         FOREIGN KEY(test_plan_id)
         REFERENCES test_plans(id)
@@ -46,11 +44,16 @@ CREATE TABLE mappings (
 --
 CREATE TABLE test_execution_results (
     id UUID PRIMARY KEY,
+    test_plan_id UUID NOT NULL,
     discovered_component_id UUID NOT NULL,
     test_component_id VARCHAR(255) NOT NULL,
     status VARCHAR(50) NOT NULL,
     log TEXT,
     executed_at TIMESTAMP NOT NULL,
+    CONSTRAINT fk_test_plan
+        FOREIGN KEY(test_plan_id)
+        REFERENCES test_plans(id)
+        ON DELETE CASCADE,
     CONSTRAINT fk_discovered_component
         FOREIGN KEY(discovered_component_id)
         REFERENCES discovered_components(id)
@@ -59,3 +62,4 @@ CREATE TABLE test_execution_results (
 
 -- Optional: Add indexes for performance
 CREATE INDEX idx_discovered_components_test_plan_id ON discovered_components(test_plan_id);
+CREATE INDEX idx_test_execution_results_test_plan_id ON test_execution_results(test_plan_id);
