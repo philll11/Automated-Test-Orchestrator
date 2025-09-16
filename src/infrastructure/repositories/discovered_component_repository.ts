@@ -1,6 +1,6 @@
 // src/infrastructure/repositories/discovered_component_repository.ts
 
-import { Pool } from 'pg';
+import type { Pool } from 'pg';
 import { injectable, inject } from 'inversify';
 import { IDiscoveredComponentRepository } from "../../ports/i_discovered_component_repository.js";
 import { DiscoveredComponent } from "../../domain/discovered_component.js";

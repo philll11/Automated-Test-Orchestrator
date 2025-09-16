@@ -1,14 +1,19 @@
 // src/inversify.types.ts
 
 export const TYPES = {
-    // Test Plan related
+    // Test Plan
     ITestPlanService: Symbol.for('ITestPlanService'),
     TestPlanController: Symbol.for('TestPlanController'),
     
-    // Mapping related
+    // Mapping
     IMappingService: Symbol.for('IMappingService'),
     MappingsController: Symbol.for('MappingsController'),
 
+    // Credentials
+    ICredentialService: Symbol.for('ICredentialService'),
+    CredentialsController: Symbol.for('CredentialsController'),
+    ISecureCredentialService: Symbol.for('ISecureCredentialService'),
+    
     // Repositories
     ITestPlanRepository: Symbol.for('ITestPlanRepository'),
     IDiscoveredComponentRepository: Symbol.for('IDiscoveredComponentRepository'),
@@ -17,4 +22,5 @@ export const TYPES = {
     
     // Infrastructure
     PostgresPool: Symbol.for('PostgresPool'),
+    IIntegrationPlatformServiceFactory: Symbol.for('IIntegrationPlatformServiceFactory'),
 };

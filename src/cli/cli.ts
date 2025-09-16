@@ -4,6 +4,7 @@ import { program, Command } from 'commander';
 import { registerDiscoverCommand } from './commands/discover.js';
 import { registerExecuteCommand } from './commands/execute.js';
 import { credsCommand } from './commands/creds.js';
+import { registerMappingsCommand } from './commands/mappings.js';
 
 program
   .name('ato')
@@ -13,6 +14,7 @@ program
 // Register commands
 registerDiscoverCommand(program as Command);
 registerExecuteCommand(program as Command);
+registerMappingsCommand(program as Command);
 program.addCommand(credsCommand);
 
 program.parse(process.argv);

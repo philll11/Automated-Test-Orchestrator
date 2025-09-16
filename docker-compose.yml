@@ -35,6 +35,7 @@ services:
     depends_on:
       - postgres-dev
     environment:
+      NODE_ENV: development
       DB_HOST: postgres-dev
       DB_USER: devuser
       DB_PASSWORD: devpassword

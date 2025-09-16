@@ -21,17 +21,18 @@ const pollForStatus = async (planId: string, targetStatus: string, timeout: numb
 
 describe('Live System End-to-End Tests', () => {
     let testPool: Pool;
-    const integrationPlatformCredentials = {
+    const liveTestProfileName = 'live-system-e2e-profile';
+    const liveCredentials = {
         accountId: process.env.BOOMI_TEST_ACCOUNT_ID!,
         username: process.env.BOOMI_TEST_USERNAME!,
         passwordOrToken: process.env.BOOMI_TEST_TOKEN!,
+        executionInstanceId: process.env.BOOMI_TEST_ATOM_ID!,
     };
     const rootComponentId = process.env.BOOMI_TEST_ROOT_COMPONENT_ID!;
     const mappedTestId = process.env.BOOMI_TEST_MAPPED_TEST_ID!;
-    const executionInstanceId = process.env.BOOMI_TEST_ATOM_ID!;
 
-    beforeAll(() => {
-        if (!integrationPlatformCredentials.accountId || !rootComponentId || !mappedTestId || !executionInstanceId) {
+    beforeAll(async () => {
+        if (!liveCredentials.accountId || !liveCredentials.username || !liveCredentials.passwordOrToken || !liveCredentials.executionInstanceId || !rootComponentId || !mappedTestId) {
             throw new Error('Missing one or more required BOOMI_TEST environment variables. Skipping live tests.');
         }
         testPool = new Pool({
@@ -41,6 +42,11 @@ describe('Live System End-to-End Tests', () => {
             password: process.env.DB_PASSWORD,
             port: parseInt(process.env.DB_PORT || '5433', 10),
         });
+
+        await request(app)
+            .post('/api/v1/credentials')
+            .send({ profileName: liveTestProfileName, ...liveCredentials })
+            .expect(201);
     });
 
     beforeEach(async () => {
@@ -49,11 +55,12 @@ describe('Live System End-to-End Tests', () => {
     });
 
     afterAll(async () => {
+        await request(app).delete(`/api/v1/credentials/${liveTestProfileName}`);
         await testPool.end();
         await globalPool.end();
     });
 
-    // --- NEW Test Suite for the Mappings API ---
+    // --- Test Suite for the Mappings API ---
     describe('Mappings Administration', () => {
         it('should allow creating and deleting a mapping via the API', async () => {
             const newMainComponentId = rootComponentId;
@@ -64,7 +71,7 @@ describe('Live System End-to-End Tests', () => {
                 .post('/api/v1/mappings')
                 .send({ mainComponentId: newMainComponentId, testComponentId: newTestComponentId })
                 .expect(201);
-            
+
             const newMappingId = createResponse.body.data.id;
             expect(newMappingId).toBeDefined();
 
@@ -77,7 +84,7 @@ describe('Live System End-to-End Tests', () => {
             await request(app)
                 .delete(`/api/v1/mappings/${newMappingId}`)
                 .expect(204);
-            
+
             // 4. VERIFY deletion in the database
             const finalDbResult = await testPool.query('SELECT * FROM mappings WHERE id = $1', [newMappingId]);
             expect(finalDbResult.rowCount).toBe(0);
@@ -88,6 +95,7 @@ describe('Live System End-to-End Tests', () => {
     describe('Discovery Stage', () => {
         beforeEach(async () => {
             // Seed the specific mapping needed for this test suite
+            await testPool.query('TRUNCATE TABLE mappings RESTART IDENTITY CASCADE');
             await testPool.query(
                 'INSERT INTO mappings (id, main_component_id, test_component_id, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW())',
                 [uuidv4(), rootComponentId, mappedTestId]
@@ -97,7 +105,7 @@ describe('Live System End-to-End Tests', () => {
         it('should initiate discovery and find the pre-seeded test mapping', async () => {
             const discoveryResponse = await request(app)
                 .post('/api/v1/test-plans')
-                .send({ rootComponentId, integrationPlatformCredentials })
+                .send({ rootComponentId, credentialProfile: liveTestProfileName })
                 .expect(202);
 
             const planId = discoveryResponse.body.data.id;
@@ -105,10 +113,10 @@ describe('Live System End-to-End Tests', () => {
 
             const discoveryResult = await pollForStatus(planId, 'AWAITING_SELECTION');
             const rootDiscovered = discoveryResult.discoveredComponents.find((c: any) => c.componentId === rootComponentId);
-            
+
             expect(rootDiscovered).toBeDefined();
             expect(rootDiscovered.availableTests).toContain(mappedTestId);
-        }, 25000);
+        }, 25000); // Increased timeout for live discovery
     });
 
     // --- Test Suite for the Execution Stage ---
@@ -116,8 +124,10 @@ describe('Live System End-to-End Tests', () => {
         let planId: string;
         let discoveredComponentId: string;
 
+
         beforeEach(async () => {
-            // Seed the specific mapping AND the discovered plan state for this suite
+            // Seed the database to simulate a completed discovery phase.
+            await testPool.query('TRUNCATE TABLE mappings RESTART IDENTITY CASCADE');
             await testPool.query(
                 'INSERT INTO mappings (id, main_component_id, test_component_id, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW())',
                 [uuidv4(), rootComponentId, mappedTestId]
@@ -128,17 +138,18 @@ describe('Live System End-to-End Tests', () => {
             await testPool.query(`INSERT INTO discovered_components (id, test_plan_id, component_id) VALUES ($1, $2, $3)`, [discoveredComponentId, planId, rootComponentId]);
         });
 
-        it('should execute a test and create a successful result record', async () => {
+        it('should execute a test using a credential profile and create a successful result record', async () => {
             await request(app)
                 .post(`/api/v1/test-plans/${planId}/execute`)
-                .send({ testsToRun: [mappedTestId], integrationPlatformCredentials, executionInstanceId })
+                .send({ testsToRun: [mappedTestId], credentialProfile: liveTestProfileName })
                 .expect(202);
 
+            // Wait for the live Boomi execution to complete.
             await pollForStatus(planId, 'COMPLETED', 45000);
 
             const resultsDbResult = await testPool.query('SELECT status FROM test_execution_results WHERE discovered_component_id = $1', [discoveredComponentId]);
             expect(resultsDbResult.rowCount).toBe(1);
             expect(resultsDbResult.rows[0].status).toBe('SUCCESS');
-        }, 50000);
+        }, 50000); // Increased timeout for live API calls
     });
 });

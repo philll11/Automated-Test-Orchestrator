@@ -1,6 +1,6 @@
 // src/infrastructure/repositories/test_plan_repository.ts
 
-import { Pool } from 'pg';
+import type { Pool } from 'pg';
 import { injectable, inject } from 'inversify';
 import { ITestPlanRepository } from "../../ports/i_test_plan_repository.js";
 import { TestPlan } from "../../domain/test_plan.js";

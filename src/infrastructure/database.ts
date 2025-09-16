@@ -1,8 +1,9 @@
 // src/infrastructure/database.ts
 
 import pg from 'pg';
+const { Pool } = pg;
 
-const pool = new pg.Pool({
+const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
   database: process.env.DB_NAME || 'test_orchestrator',

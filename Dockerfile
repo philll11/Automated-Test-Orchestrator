@@ -16,6 +16,9 @@ COPY . .
 # Compile TypeScript to JavaScript
 RUN npm run build
 
+# Link the CLI globally
+RUN npm link
+
 # The port that your app will run on
 EXPOSE 3000
 

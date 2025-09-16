@@ -3,34 +3,24 @@
 import { Command } from 'commander';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
-import { SecureCredentialService } from '../../infrastructure/secure_credential_service.js';
-import { IntegrationPlatformCredentials } from '../../domain/integration_platform_credentials.js';
+import { addCredentialProfile, listCredentialProfiles, deleteCredentialProfile } from '../api_client.js';
+import { handleCliError } from '../error_handler.js';
 
 async function addCredentialCommand(profile: string): Promise<void> {
-    console.log(`Adding new credentials for profile: ${profile}`);
-
     try {
+        console.log(`Adding new credentials for profile: ${chalk.cyan(profile)}`);
         const answers = await _promptForCredentials();
-        const credentialService = new SecureCredentialService();
-        await credentialService.addCredentials(profile, answers);
+        await addCredentialProfile(profile, answers);
         console.log(`✅ Profile "${profile}" has been saved securely.`);
 
     } catch (error: any) {
-        if (error.name === 'ExitPromptError') {
-            console.log('\n👋 Add command cancelled by user.');
-            process.exit(0);
-        } else {
-            console.error('\n❌ An unexpected error occurred:', error instanceof Error ? error.message : String(error));
-            process.exit(1);
-        }
+        handleCliError(error);
     }
 }
 
 async function listCredentialsCommand(): Promise<void> {
     try {
-        const credentialService = new SecureCredentialService();
-        const profiles = await credentialService.getAllCredentials();
-
+        const profiles = await listCredentialProfiles();
         if (profiles.length === 0) {
             console.log(chalk.yellow('No credential profiles found. Use "ato creds add <profile>" to add one.'));
             return;
@@ -42,35 +32,26 @@ async function listCredentialsCommand(): Promise<void> {
             'Profile Name': p.profileName,
             'Account ID': p.credentials.accountId,
             'Username': p.credentials.username,
-            'Atom ID': p.credentials.executionInstanceId,
+            'Execution Instance': p.credentials.executionInstanceId,
         }));
 
         console.table(displayData);
 
-    } catch (error) {
-        console.error('❌ Error listing credentials:', error instanceof Error ? error.message : String(error));
-        process.exit(1);
+    } catch (error: any) {
+        handleCliError(error);
     }
 }
 
 async function deleteCredentialCommand(profile: string): Promise<void> {
     try {
-        const credentialService = new SecureCredentialService();
-        const success = await credentialService.deleteCredentials(profile);
-
-        if (success) {
-            console.log(chalk.green(`✅ Profile "${profile}" was successfully deleted.`));
-        } else {
-            console.error(chalk.red(`❌ Error: Profile "${profile}" not found.`));
-            process.exit(1);
-        }
-    } catch (error) {
-        console.error('❌ Error deleting credentials:', error instanceof Error ? error.message : String(error));
-        process.exit(1);
+        await deleteCredentialProfile(profile);
+        console.log(chalk.green(`✅ Profile "${profile}" was successfully deleted.`));
+    } catch (error: any) {
+        handleCliError(error);
     }
 }
 
-function _promptForCredentials(): Promise<IntegrationPlatformCredentials> {
+function _promptForCredentials(): Promise<{ [key: string]: any }> {
     return inquirer.prompt([
         {
             type: 'input',

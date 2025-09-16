@@ -5,11 +5,6 @@ export interface IntegrationPlatformCredentials {
     username: string;
     passwordOrToken: string;
 }
-
-export interface TestExecutionOptions {
-  executionInstanceId: string;
-}
-
 export interface TestExecutionResult {
   status: 'SUCCESS' | 'FAILURE';
   message: string;
@@ -25,5 +20,5 @@ export interface ComponentInfo {
 
 export interface IIntegrationPlatformService {
   getComponentInfoAndDependencies(componentId: string): Promise<ComponentInfo | null>;
-  executeTestProcess(componentId: string, options: TestExecutionOptions): Promise<TestExecutionResult>;
+  executeTestProcess(componentId: string): Promise<TestExecutionResult>;
 }

@@ -1,6 +1,6 @@
 // src/infrastructure/repositories/component_test_mapping_repository.ts
 
-import { Pool } from 'pg';
+import type { Pool } from 'pg';
 import { injectable, inject } from 'inversify';
 import { IMappingRepository, UpdateMappingData } from "../../ports/i_mapping_repository.js";
 import { Mapping } from "../../domain/mapping.js";

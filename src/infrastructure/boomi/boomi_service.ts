@@ -1,7 +1,8 @@
 // src/infrastructure/boomi/boomi_service.ts
 
 import axios, { AxiosInstance } from 'axios';
-import { IIntegrationPlatformService, IntegrationPlatformCredentials, TestExecutionResult, TestExecutionOptions, ComponentInfo } from '../../ports/i_integration_platform_service.js';
+import { IIntegrationPlatformService, TestExecutionResult, ComponentInfo } from '../../ports/i_integration_platform_service.js';
+import { IntegrationPlatformCredentials } from '../../domain/integration_platform_credentials.js';
 import { AuthenticationError } from '../../utils/app_error.js';
 
 // --- Type Definitions for Boomi API Responses ---
@@ -33,6 +34,7 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export class BoomiService implements IIntegrationPlatformService {
     private apiClient: AxiosInstance;
+    private readonly executionInstanceId: string;
     private pollInterval: number;
     private maxPolls: number;
 
@@ -51,6 +53,7 @@ export class BoomiService implements IIntegrationPlatformService {
                 'Accept': 'application/json'
             }
         });
+        this.executionInstanceId = credentials.executionInstanceId;
         this.pollInterval = options.pollInterval ?? 1000;
         this.maxPolls = options.maxPolls ?? 60;
     }
@@ -134,11 +137,11 @@ export class BoomiService implements IIntegrationPlatformService {
         }
     }
 
-    public async executeTestProcess(componentId: string, options: TestExecutionOptions): Promise<TestExecutionResult> {
+    public async executeTestProcess(componentId: string): Promise<TestExecutionResult> {
         try {
             const executionRequest = {
                 '@type': 'ExecutionRequest',
-                atomId: options.executionInstanceId,
+                atomId: this.executionInstanceId,
                 processId: componentId,
             };
             const initResponse = await this.apiClient.post('/ExecutionRequest', executionRequest);

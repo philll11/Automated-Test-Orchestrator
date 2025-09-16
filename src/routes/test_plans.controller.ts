@@ -5,7 +5,7 @@ import { injectable, inject } from 'inversify';
 import { TYPES } from '../inversify.types.js';
 import { ITestPlanService } from '../ports/i_test_plan_service.js';
 import { BadRequestError, NotFoundError } from '../utils/app_error.js';
-import { BoomiService } from '../infrastructure/boomi/boomi_service.js';
+// REMOVED: The controller no longer has knowledge of the specific integration platform implementation.
 
 @injectable()
 export class TestPlanController {
@@ -19,26 +19,23 @@ export class TestPlanController {
      *   post:
      *     summary: Initiate Discovery
      *     tags: [Test Plans]
-     *     description: Initiates a new run by providing a root Component ID and credentials. The discovery process runs asynchronously.
+     *     description: Initiates a new run by providing a root Component ID and a credential profile name. The discovery process runs asynchronously.
      *     requestBody:
      *       required: true
      *       content:
      *         application/json:
      *           schema:
      *             type: object
+     *             required:
+     *               - rootComponentId
+     *               - credentialProfile
      *             properties:
      *               rootComponentId:
      *                 type: string
      *                 example: "2582515a-40fb-4d5d-bcc9-10817caa4fa2"
-     *               integrationPlatformCredentials:
-     *                 type: object
-     *                 properties:
-     *                   accountId:
-     *                     type: string
-     *                   username:
-     *                     type: string
-     *                   passwordOrToken:
-     *                     type: string
+     *               credentialProfile:
+     *                 type: string
+     *                 example: "dev-account"
      *     responses:
      *       '202':
      *         description: Accepted. The discovery process has been initiated.
@@ -48,20 +45,14 @@ export class TestPlanController {
      *               $ref: '#/components/schemas/ApiResponse_TestPlan'
      *       '400':
      *         description: Bad Request. Missing required fields.
-     *         content:
-     *           application/json:
-     *             schema:
-     *               $ref: '#/components/schemas/ErrorResponse'
      */
     public async initiateDiscovery(req: Request, res: Response): Promise<void> {
-        const { rootComponentId, integrationPlatformCredentials } = req.body;
-        if (!rootComponentId || !integrationPlatformCredentials) {
-            throw new BadRequestError('rootComponentId and integrationPlatformCredentials are required');
+        const { rootComponentId, credentialProfile } = req.body;
+        if (!rootComponentId || !credentialProfile) {
+            throw new BadRequestError('rootComponentId and credentialProfile are required');
         }
-        // The controller creates the concrete service
-        const boomiService = new BoomiService(integrationPlatformCredentials);
 
-        const testPlan = await this.testPlanService.initiateDiscovery(rootComponentId, boomiService);
+        const testPlan = await this.testPlanService.initiateDiscovery(rootComponentId, credentialProfile);
 
         res.status(202).json({
             metadata: { code: 202, message: 'Accepted' },
@@ -93,10 +84,6 @@ export class TestPlanController {
      *               $ref: '#/components/schemas/ApiResponse_TestPlanWithComponents'
      *       '404':
      *         description: Test plan not found.
-     *         content:
-     *           application/json:
-     *             schema:
-     *               $ref: '#/components/schemas/ErrorResponse'
      */
     public async getPlanAndComponents(req: Request, res: Response): Promise<void> {
         const { planId } = req.params;
@@ -118,7 +105,7 @@ export class TestPlanController {
      *   post:
      *     summary: Execute Selected Tests
      *     tags: [Test Plans]
-     *     description: Executes the user-selected test components found in a specific test plan.
+     *     description: Executes the user-selected test components found in a specific test plan using a credential profile.
      *     parameters:
      *       - in: path
      *         name: planId
@@ -133,49 +120,32 @@ export class TestPlanController {
      *         application/json:
      *           schema:
      *             type: object
+     *             required:
+     *               - testsToRun
+     *               - credentialProfile
      *             properties:
      *               testsToRun:
      *                 type: array
      *                 items:
      *                   type: string
      *                 example: ["TEST-xyz-789"]
-     *               integrationPlatformCredentials:
-     *                 type: object
-     *                 properties:
-     *                   accountId:
-     *                     type: string
-     *                   username:
-     *                     type: string
-     *                   passwordOrToken:
-     *                     type: string
-     *               executionInstanceId:
-     *                  type: string
-     *                  example: "atom-12345"
+     *               credentialProfile:
+     *                 type: string
+     *                 example: "dev-account"
      *     responses:
      *       '202':
      *         description: Accepted. The test execution has been initiated.
-     *         content:
-     *            application/json:
-     *              schema:
-     *                type: object
-     *                properties:
-     *                  metadata:
-     *                    $ref: '#/components/schemas/ResponseMetadata'
      */
     public async executeTests(req: Request, res: Response): Promise<void> {
         const { planId } = req.params;
-        const { testsToRun, integrationPlatformCredentials, executionInstanceId } = req.body;
+        const { testsToRun, credentialProfile } = req.body;
 
-        if (!testsToRun || !Array.isArray(testsToRun) || !integrationPlatformCredentials || !executionInstanceId) {
-            throw new BadRequestError('testsToRun must be an array, and integrationPlatformCredentials and executionInstanceId must be provided.');
+        if (!testsToRun || !Array.isArray(testsToRun) || !credentialProfile) {
+            throw new BadRequestError('testsToRun (as an array) and credentialProfile must be provided.');
         }
 
-        // The controller creates the concrete service
-        const boomiService = new BoomiService(integrationPlatformCredentials);
-
-        // We call the service without awaiting it, as before
-        this.testPlanService.executeTests(planId, testsToRun, boomiService, executionInstanceId).catch(err => {
-            console.error(`[Execution Error] for plan ${planId}:`, err);
+        this.testPlanService.executeTests(planId, testsToRun, credentialProfile).catch(err => {
+            console.error(`[Execution Error] Unhandled rejection for plan ${planId}:`, err);
         });
 
         res.status(202).json({

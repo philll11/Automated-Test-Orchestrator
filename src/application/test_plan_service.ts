@@ -3,7 +3,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { injectable, inject } from 'inversify';
 import { TYPES } from '../inversify.types.js';
-import { ITestPlanService, TestPlanWithDetails  } from "../ports/i_test_plan_service.js";
+import { ITestPlanService, TestPlanWithDetails } from "../ports/i_test_plan_service.js";
 import { TestPlan } from "../domain/test_plan.js";
 import { ITestPlanRepository } from "../ports/i_test_plan_repository.js";
 import { IIntegrationPlatformService, ComponentInfo } from "../ports/i_integration_platform_service.js";
@@ -11,6 +11,7 @@ import { DiscoveredComponent } from "../domain/discovered_component.js";
 import { IDiscoveredComponentRepository } from "../ports/i_discovered_component_repository.js";
 import { IMappingRepository } from "../ports/i_mapping_repository.js";
 import { ITestExecutionResultRepository } from '../ports/i_test_execution_result_repository.js';
+import { IIntegrationPlatformServiceFactory } from '../ports/i_integration_platform_service_factory.js';
 
 @injectable()
 export class TestPlanService implements ITestPlanService {
@@ -18,20 +19,23 @@ export class TestPlanService implements ITestPlanService {
     private readonly discoveredComponentRepository: IDiscoveredComponentRepository;
     private readonly componentTestMappingRepository: IMappingRepository;
     private readonly testExecutionResultRepository: ITestExecutionResultRepository;
+    private readonly platformServiceFactory: IIntegrationPlatformServiceFactory;
 
     constructor(
         @inject(TYPES.ITestPlanRepository) testPlanRepository: ITestPlanRepository,
         @inject(TYPES.IDiscoveredComponentRepository) discoveredComponentRepository: IDiscoveredComponentRepository,
         @inject(TYPES.IMappingRepository) componentTestMappingRepository: IMappingRepository,
-        @inject(TYPES.ITestExecutionResultRepository) testExecutionResultRepository: ITestExecutionResultRepository
+        @inject(TYPES.ITestExecutionResultRepository) testExecutionResultRepository: ITestExecutionResultRepository,
+        @inject(TYPES.IIntegrationPlatformServiceFactory) platformServiceFactory: IIntegrationPlatformServiceFactory
     ) {
         this.testPlanRepository = testPlanRepository;
         this.discoveredComponentRepository = discoveredComponentRepository;
         this.componentTestMappingRepository = componentTestMappingRepository;
         this.testExecutionResultRepository = testExecutionResultRepository;
+        this.platformServiceFactory = platformServiceFactory;
     }
 
-    public async initiateDiscovery(rootComponentId: string, integrationPlatformService: IIntegrationPlatformService): Promise<TestPlan> {
+    public async initiateDiscovery(rootComponentId: string, credentialProfile: string): Promise<TestPlan> {
         const testPlan: TestPlan = {
             id: uuidv4(),
             rootComponentId,
@@ -42,7 +46,7 @@ export class TestPlanService implements ITestPlanService {
 
         const savedTestPlan = await this.testPlanRepository.save(testPlan);
 
-        this.discoverAndSaveAllDependencies(rootComponentId, savedTestPlan.id, integrationPlatformService)
+        this.discoverAndSaveAllDependencies(rootComponentId, savedTestPlan.id, credentialProfile)
             .catch(async error => {
                 console.error(`[TestPlanService] Discovery failed for plan ${savedTestPlan.id}.`, error);
                 const failedPlan: TestPlan = {
@@ -57,11 +61,13 @@ export class TestPlanService implements ITestPlanService {
         return savedTestPlan;
     }
 
-    public async discoverAndSaveAllDependencies(rootComponentId: string, testPlanId: string, integrationPlatformService: IIntegrationPlatformService): Promise<void> {
+    public async discoverAndSaveAllDependencies(rootComponentId: string, testPlanId: string, credentialProfile: string): Promise<void> {
         const testPlan = await this.testPlanRepository.findById(testPlanId);
         if (!testPlan) throw new Error(`TestPlan with id ${testPlanId} not found.`);
 
         try {
+            const integrationPlatformService = await this.platformServiceFactory.create(credentialProfile);
+
             const discoveredComponentsMap = await this._findAllDependenciesRecursive(rootComponentId, integrationPlatformService);
             const discoveredComponents: DiscoveredComponent[] = Array.from(discoveredComponentsMap.values()).map(info => ({
                 id: uuidv4(),
@@ -118,7 +124,7 @@ export class TestPlanService implements ITestPlanService {
         };
     }
 
-    public async executeTests(planId: string, testsToRun: string[], integrationPlatformService: IIntegrationPlatformService, executionInstanceId: string): Promise<void> {
+    public async executeTests(planId: string, testsToRun: string[], credentialProfile: string): Promise<void> {
         const testPlan = await this.testPlanRepository.findById(planId);
         if (!testPlan) throw new Error(`TestPlan with id ${planId} not found.`);
         if (testPlan.status !== 'AWAITING_SELECTION') throw new Error(`TestPlan not in AWAITING_SELECTION state.`);
@@ -126,6 +132,8 @@ export class TestPlanService implements ITestPlanService {
         await this.testPlanRepository.update({ ...testPlan, status: 'EXECUTING' });
 
         try {
+            const integrationPlatformService = await this.platformServiceFactory.create(credentialProfile);
+
             const discoveredComponents = await this.discoveredComponentRepository.findByTestPlanId(planId);
             const mainComponentIds = discoveredComponents.map(c => c.componentId);
             const allAvailableTestsMap = await this.componentTestMappingRepository.findAllTestsForMainComponents(mainComponentIds);
@@ -145,7 +153,7 @@ export class TestPlanService implements ITestPlanService {
                     return;
                 }
 
-                const result = await integrationPlatformService.executeTestProcess(testId, { executionInstanceId });
+                const result = await integrationPlatformService.executeTestProcess(testId);
 
                 await this.testExecutionResultRepository.save({
                     discoveredComponentId: discoveredComponent.id,

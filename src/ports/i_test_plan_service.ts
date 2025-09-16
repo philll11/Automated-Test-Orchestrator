@@ -2,7 +2,6 @@
 
 import { TestPlan } from "../domain/test_plan.js";
 import { DiscoveredComponent } from '../domain/discovered_component.js';
-import { IIntegrationPlatformService } from "./i_integration_platform_service.js";
 import { TestExecutionResult } from "../domain/test_execution_result.js";
 
 export type DiscoveredComponentDetails = DiscoveredComponent & {
@@ -25,17 +24,16 @@ export interface ITestPlanService {
   /**
    * Initiates the asynchronous discovery of a component's dependency tree.
    * @param rootComponentId The starting component ID.
-   * @param integrationPlatformService An initialized service for communicating with the integration platform.
-   * @returns A new TestPlan in a 'PENDING' state.
+   * @param credentialProfile The name of the credential profile to use for authentication.
+   * @returns A new TestPlan in a 'DISCOVERING' state.
    */
-  initiateDiscovery(rootComponentId: string, integrationPlatformService: IIntegrationPlatformService): Promise<TestPlan>;
+  initiateDiscovery(rootComponentId: string, credentialProfile: string): Promise<TestPlan>;
 
   /**
    * Executes a selected list of tests for a given test plan.
    * @param planId The ID of the test plan.
    * @param testsToRun An array of test component IDs to execute.
-   * @param integrationPlatformService An initialized service for communicating with the integration platform.
-   * @param executionInstanceId An identifier for the specific execution environment (e.g., an Atom ID).
+   * @param credentialProfile The name of the credential profile to use for authentication and execution.
    */
-  executeTests(planId: string, testsToRun: string[], integrationPlatformService: IIntegrationPlatformService, executionInstanceId: string): Promise<void>;
+  executeTests(planId: string, testsToRun: string[], credentialProfile: string): Promise<void>;
 }

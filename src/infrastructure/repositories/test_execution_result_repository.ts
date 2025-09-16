@@ -1,6 +1,6 @@
 // src/infrastructure/repositories/test_execution_result_repository.ts
 
-import { Pool } from 'pg';
+import type { Pool } from 'pg';
 import { injectable, inject } from 'inversify';
 import { v4 as uuidv4 } from 'uuid';
 import { ITestExecutionResultRepository, NewTestExecutionResult } from '../../ports/i_test_execution_result_repository.js';

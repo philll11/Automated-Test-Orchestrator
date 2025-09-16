@@ -11,8 +11,13 @@ const BOOMI_API_BASE = 'https://api.boomi.com';
 
 describe('Execution End-to-End Test', () => {
     let testPool: pg.Pool;
-    const credentials = { accountId: 'test-account-e2e', username: 'testuser', passwordOrToken: 'testpass' };
-    const executionInstanceId = 'test-atom-e2e';
+    const testProfileName = 'e2e-exec-profile';
+    const credentials = {
+        accountId: 'test-account-e2e',
+        username: 'testuser',
+        passwordOrToken: 'testpass',
+        executionInstanceId: 'test-atom-e2e'
+    };
     const baseApiUrl = `/api/rest/v1/${credentials.accountId}`;
 
     beforeAll(() => {
@@ -26,8 +31,17 @@ describe('Execution End-to-End Test', () => {
     });
 
     beforeEach(async () => {
-        await testPool.query('TRUNCATE TABLE test_plans RESTART IDENTITY CASCADE');
+        await testPool.query('TRUNCATE TABLE test_plans, discovered_components, mappings, test_execution_results RESTART IDENTITY CASCADE');
         nock.cleanAll();
+
+        await request(app)
+            .post('/api/v1/credentials')
+            .send({ profileName: testProfileName, ...credentials })
+            .expect(201);
+    });
+
+    afterEach(async () => {
+        await request(app).delete(`/api/v1/credentials/${testProfileName}`).expect(204);
     });
 
     afterAll(async () => {
@@ -39,10 +53,10 @@ describe('Execution End-to-End Test', () => {
         // --- Arrange (1): Seed the database ---
         const planId = uuidv4();
         await testPool.query(`INSERT INTO test_plans (id, root_component_id, status, created_at, updated_at) VALUES ($1, 'root', 'AWAITING_SELECTION', NOW(), NOW())`, [planId]);
-        
+
         const discoveredComponentId = uuidv4();
         await testPool.query(`INSERT INTO discovered_components (id, test_plan_id, component_id, component_name) VALUES ($1, $2, 'comp-abc', 'Component to Test')`, [discoveredComponentId, planId]);
-        
+
         const testToRun = 'test-abc-123';
         await testPool.query(`INSERT INTO mappings (id, main_component_id, test_component_id, created_at, updated_at) VALUES ($1, 'comp-abc', $2, NOW(), NOW())`, [uuidv4(), testToRun]);
 
@@ -59,11 +73,10 @@ describe('Execution End-to-End Test', () => {
             .post(`/api/v1/test-plans/${planId}/execute`)
             .send({
                 testsToRun: [testToRun],
-                integrationPlatformCredentials: credentials, // <-- CORRECTED PROPERTY NAME
-                executionInstanceId: executionInstanceId,
+                credentialProfile: testProfileName,
             })
             .expect(202);
-        
+
         // --- Wait for the asynchronous process to complete ---
         await new Promise(resolve => setTimeout(resolve, 500));
 

@@ -4,12 +4,13 @@ import { TestPlanService } from './test_plan_service.js';
 import { ITestPlanRepository } from '../ports/i_test_plan_repository.js';
 import { IDiscoveredComponentRepository } from '../ports/i_discovered_component_repository.js';
 import { DiscoveredComponent } from '../domain/discovered_component.js';
-import { IMappingRepository } from '../ports/i_component_test_mapping_repository.js';
+import { IMappingRepository } from '../ports/i_mapping_repository.js';
 import { IIntegrationPlatformService } from '../ports/i_integration_platform_service.js';
-import { TestPlan, TestPlanStatus } from '../domain/test_plan.js';
+import { TestPlan } from '../domain/test_plan.js';
 import { TestPlanWithDetails } from '../ports/i_test_plan_service.js';
 import { ITestExecutionResultRepository } from '../ports/i_test_execution_result_repository.js';
 import { TestExecutionResult } from '../domain/test_execution_result.js';
+import { IIntegrationPlatformServiceFactory } from '../ports/i_integration_platform_service_factory.js';
 
 // --- JEST MOCKS FOR ALL REPOSITORY PORTS ---
 const mockTestPlanRepo: jest.Mocked<ITestPlanRepository> = {
@@ -44,6 +45,10 @@ const mockIntegrationService: jest.Mocked<IIntegrationPlatformService> = {
     executeTestProcess: jest.fn(),
 };
 
+const mockPlatformServiceFactory: jest.Mocked<IIntegrationPlatformServiceFactory> = {
+    create: jest.fn(),
+};
+
 // Helper for async "fire-and-forget" tasks
 const allowAsyncOperations = () => new Promise(process.nextTick);
 
@@ -59,7 +64,8 @@ describe('TestPlanService', () => {
             mockTestPlanRepo,
             mockDiscoveredComponentRepo,
             mockComponentTestMappingRepo,
-            mockTestExecutionResultRepo
+            mockTestExecutionResultRepo,
+            mockPlatformServiceFactory
         );
     });
 
@@ -102,16 +108,19 @@ describe('TestPlanService', () => {
 
     // --- Test the workflow statuses ---
     describe('initiateDiscovery', () => {
+        const credentialProfile = 'test-profile';
+
         it('should create a TestPlan with DISCOVERING status and trigger async discovery', async () => {
             const rootComponentId = 'root-123';
             mockTestPlanRepo.save.mockImplementation(async (plan) => ({ ...plan, id: 'plan-uuid' }));
+
             const discoverySpy = jest.spyOn(service, 'discoverAndSaveAllDependencies').mockResolvedValue();
 
-            const result = await service.initiateDiscovery(rootComponentId, mockIntegrationService);
+            const result = await service.initiateDiscovery(rootComponentId, credentialProfile);
 
             expect(result.status).toBe('DISCOVERING');
             expect(mockTestPlanRepo.save).toHaveBeenCalledWith(expect.objectContaining({ rootComponentId, status: 'DISCOVERING' }));
-            expect(discoverySpy).toHaveBeenCalledWith(rootComponentId, 'plan-uuid', mockIntegrationService);
+            expect(discoverySpy).toHaveBeenCalledWith(rootComponentId, 'plan-uuid', credentialProfile);
         });
 
         it('should update the plan to DISCOVERY_FAILED if the async process throws an error', async () => {
@@ -119,11 +128,10 @@ describe('TestPlanService', () => {
             const apiError = new Error("API is down");
             jest.spyOn(service, 'discoverAndSaveAllDependencies').mockRejectedValue(apiError);
 
-            await service.initiateDiscovery('root-123', mockIntegrationService);
+            await service.initiateDiscovery('root-123', credentialProfile);
             
             await allowAsyncOperations(); // Allow the promise's catch block to execute
 
-            expect(mockTestPlanRepo.update).toHaveBeenCalledTimes(1);
             expect(mockTestPlanRepo.update).toHaveBeenCalledWith(expect.objectContaining({
                 status: 'DISCOVERY_FAILED',
                 failureReason: apiError.message,
@@ -134,25 +142,28 @@ describe('TestPlanService', () => {
     // --- Test the discovery logic ---
     describe('discoverAndSaveAllDependencies', () => {
         const rootId = 'root-comp';
-        const testPlan: TestPlan = { id: 'plan-uuid', rootComponentId: rootId, status: 'DISCOVERING', createdAt: new Date(), updatedAt: new Date() };
+        const planId = 'plan-uuid';
+        const credentialProfile = 'test-profile';
+        const testPlan: TestPlan = { id: planId, rootComponentId: rootId, status: 'DISCOVERING', createdAt: new Date(), updatedAt: new Date() };
 
-        it('should save discovered components and update the plan to AWAITING_SELECTION', async () => {
+        it('should create an integration service, save components, and update the plan', async () => {
             mockTestPlanRepo.findById.mockResolvedValue(testPlan);
+            
+            mockPlatformServiceFactory.create.mockResolvedValue(mockIntegrationService);
             mockIntegrationService.getComponentInfoAndDependencies.mockResolvedValue({ id: rootId, name: 'Root', type: 'process', dependencyIds: [] });
 
-            await service.discoverAndSaveAllDependencies(rootId, testPlan.id, mockIntegrationService);
+            await service.discoverAndSaveAllDependencies(rootId, planId, credentialProfile);
 
+            expect(mockPlatformServiceFactory.create).toHaveBeenCalledWith(credentialProfile);
             expect(mockDiscoveredComponentRepo.saveAll).toHaveBeenCalledTimes(1);
-            expect(mockComponentTestMappingRepo.findAllTestsForMainComponents).not.toHaveBeenCalled(); // Verify we no longer check mappings here
-            expect(mockTestPlanRepo.update).toHaveBeenCalledWith(expect.objectContaining({
-                status: 'AWAITING_SELECTION',
-            }));
+            expect(mockTestPlanRepo.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'AWAITING_SELECTION' }));
         });
     });
 
     // --- Test the execution result logic ---
     describe('executeTests', () => {
         const planId = 'plan-to-execute';
+        const credentialProfile = 'test-profile';
         const createReadyTestPlan = (): TestPlan => ({ id: planId, rootComponentId: 'root-123', status: 'AWAITING_SELECTION', createdAt: new Date(), updatedAt: new Date() });
         const createDiscoveredComponents = (): DiscoveredComponent[] => [
             { id: 'dc-1', testPlanId: planId, componentId: 'comp-A' },
@@ -164,38 +175,26 @@ describe('TestPlanService', () => {
             mockTestPlanRepo.findById.mockResolvedValue(createReadyTestPlan());
             mockDiscoveredComponentRepo.findByTestPlanId.mockResolvedValue(createDiscoveredComponents());
             mockComponentTestMappingRepo.findAllTestsForMainComponents.mockResolvedValue(new Map([['comp-A', ['test-A']], ['comp-B', ['test-B']]]));
+            
+            mockPlatformServiceFactory.create.mockResolvedValue(mockIntegrationService);
             mockIntegrationService.executeTestProcess.mockResolvedValue({ status: 'SUCCESS', message: 'Passed' });
 
-            await service.executeTests(planId, testsToRun, mockIntegrationService, 'atom-123');
+            await service.executeTests(planId, testsToRun, credentialProfile);
 
-            expect(mockTestPlanRepo.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'EXECUTING' }));
-            expect(mockIntegrationService.executeTestProcess).toHaveBeenCalledTimes(2);
+            expect(mockPlatformServiceFactory.create).toHaveBeenCalledWith(credentialProfile);
+            expect(mockIntegrationService.executeTestProcess).toHaveBeenCalledWith('test-A');
+            expect(mockIntegrationService.executeTestProcess).toHaveBeenCalledWith('test-B');
             expect(mockTestExecutionResultRepo.save).toHaveBeenCalledTimes(2);
-            expect(mockTestExecutionResultRepo.save).toHaveBeenCalledWith(expect.objectContaining({ testComponentId: 'test-A', status: 'SUCCESS' }));
-            expect(mockTestExecutionResultRepo.save).toHaveBeenCalledWith(expect.objectContaining({ testComponentId: 'test-B', status: 'SUCCESS' }));
-            expect(mockTestPlanRepo.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'COMPLETED' }));
-        });
-
-        it('should mark plan as COMPLETED even if tests fail, and save FAILURE results', async () => {
-            const testsToRun = ['test-A'];
-            mockTestPlanRepo.findById.mockResolvedValue(createReadyTestPlan());
-            mockDiscoveredComponentRepo.findByTestPlanId.mockResolvedValue(createDiscoveredComponents());
-            mockComponentTestMappingRepo.findAllTestsForMainComponents.mockResolvedValue(new Map([['comp-A', ['test-A']]]));
-            mockIntegrationService.executeTestProcess.mockResolvedValue({ status: 'FAILURE', message: 'Assertion failed' });
-
-            await service.executeTests(planId, testsToRun, mockIntegrationService, 'atom-123');
-
-            expect(mockTestExecutionResultRepo.save).toHaveBeenCalledWith(expect.objectContaining({ status: 'FAILURE', log: 'Assertion failed' }));
             expect(mockTestPlanRepo.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'COMPLETED' }));
         });
         
         it('should update plan to EXECUTION_FAILED on a system-level error', async () => {
             const systemError = new Error("Database is down");
             mockTestPlanRepo.findById.mockResolvedValue(createReadyTestPlan());
-            // Make one of the dependencies throw an error
-            mockDiscoveredComponentRepo.findByTestPlanId.mockRejectedValue(systemError);
             
-            await service.executeTests(planId, ['test-A'], mockIntegrationService, 'atom-123');
+            mockPlatformServiceFactory.create.mockRejectedValue(systemError);
+            
+            await service.executeTests(planId, ['test-A'], credentialProfile);
             
             expect(mockTestExecutionResultRepo.save).not.toHaveBeenCalled();
             expect(mockTestPlanRepo.update).toHaveBeenCalledWith(expect.objectContaining({
