@@ -27,7 +27,8 @@
     "test:e2e:mapping": "jest --testMatch=\"**/mappings.e2e.test.ts\" --verbose",
     "test:e2e:credential": "jest --testMatch=\"**/credentials.e2e.test.ts\" --verbose",
     "test:e2e:exe_result": "jest --testMatch=\"**/test_execution_results.e2e.test.ts\" --verbose",
-    "test:e2e:all": "npm run test:e2e:discover && npm run test:e2e:execute && npm run test:e2e:live && npm run test:e2e:mapping && npm run test:e2e:credential && npm run test:e2e:exe_result"
+    "test:e2e:test_plan": "jest --testMatch=\"**/test_plans.e2e.test.ts\" --verbose",
+    "test:e2e:all": "npm run test:e2e:discover && npm run test:e2e:execute && npm run test:e2e:live && npm run test:e2e:mapping && npm run test:e2e:credential && npm run test:e2e:exe_result && npm run test:e2e:test_plan"
   },
   "keywords": [],
   "author": "",

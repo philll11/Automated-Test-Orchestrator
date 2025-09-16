@@ -16,6 +16,43 @@ export class TestPlanController {
     /**
      * @swagger
      * /api/v1/test-plans:
+     *   get:
+     *     summary: Get All Test Plans
+     *     tags: [Test Plans]
+     *     description: Retrieves a list of all test plans that have been initiated.
+     *     responses:
+     *       '200':
+     *         description: OK. An array of test plan summary objects.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 metadata:
+     *                   type: object
+     *                   properties:
+     *                     code:
+     *                       type: integer
+     *                       example: 200
+     *                     message:
+     *                       type: string
+     *                       example: OK
+     *                 data:
+     *                   type: array
+     *                   items:
+     *                     $ref: '#/components/schemas/TestPlan'
+     */
+    public async getAllPlans(req: Request, res: Response): Promise<void> {
+        const testPlans = await this.testPlanService.getAllPlans();
+        res.status(200).json({
+            metadata: { code: 200, message: 'OK' },
+            data: testPlans,
+        });
+    }
+
+    /**
+     * @swagger
+     * /api/v1/test-plans:
      *   post:
      *     summary: Initiate Discovery
      *     tags: [Test Plans]

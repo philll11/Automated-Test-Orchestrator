@@ -32,3 +32,15 @@ export class ConflictError extends AppError {
     super(message, 409);
   }
 }
+
+// Custom error for integration platform issues
+export class IntegrationPlatformError extends Error {
+  constructor(
+    message: string,
+    public readonly externalStatusCode?: number,
+    public readonly attempts?: number
+  ) {
+    super(message);
+    this.name = 'IntegrationPlatformError';
+  }
+}

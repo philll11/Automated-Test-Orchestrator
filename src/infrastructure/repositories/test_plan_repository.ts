@@ -44,4 +44,9 @@ export class TestPlanRepository implements ITestPlanRepository {
 
         return rowToTestPlan(result.rows[0]);
     }
+        async findAll(): Promise<TestPlan[]> {
+        const query = 'SELECT * FROM test_plans ORDER BY created_at DESC;';
+        const result = await this.pool.query(query);
+        return result.rows.map(rowToTestPlan);
+    }
 }

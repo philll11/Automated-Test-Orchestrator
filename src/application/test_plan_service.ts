@@ -47,8 +47,8 @@ export class TestPlanService implements ITestPlanService {
         const savedTestPlan = await this.testPlanRepository.save(testPlan);
 
         this.discoverAndSaveAllDependencies(rootComponentId, savedTestPlan.id, credentialProfile)
-            .catch(async error => {
-                console.error(`[TestPlanService] Discovery failed for plan ${savedTestPlan.id}.`, error);
+            .catch(async (error: Error) => {
+                console.error(`[TestPlanService] Discovery failed for plan ${savedTestPlan.id}: ${error.message}`);
                 const failedPlan: TestPlan = {
                     ...savedTestPlan,
                     status: 'DISCOVERY_FAILED',
@@ -59,6 +59,10 @@ export class TestPlanService implements ITestPlanService {
             });
 
         return savedTestPlan;
+    }
+
+    public async getAllPlans(): Promise<TestPlan[]> {
+        return this.testPlanRepository.findAll();
     }
 
     public async discoverAndSaveAllDependencies(rootComponentId: string, testPlanId: string, credentialProfile: string): Promise<void> {
@@ -168,11 +172,12 @@ export class TestPlanService implements ITestPlanService {
 
             await this.testPlanRepository.update({ ...testPlan, status: 'COMPLETED', updatedAt: new Date() });
         } catch (error) {
-            console.error(`[TestPlanService] A system error occurred during execution for plan ${planId}.`, error);
+            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+            console.error(`[TestPlanService] A system error occurred during execution for plan ${planId}: ${errorMessage}`);
             await this.testPlanRepository.update({
                 ...testPlan,
                 status: 'EXECUTION_FAILED',
-                failureReason: (error instanceof Error) ? error.message : 'An unknown error occurred',
+                failureReason: errorMessage,
                 updatedAt: new Date(),
             });
         }

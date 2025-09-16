@@ -15,6 +15,12 @@ export type TestPlanWithDetails = TestPlan & {
 
 export interface ITestPlanService {
   /**
+   * Retrieves a summary of all test plans.
+   * @returns A promise that resolves to an array of TestPlan objects.
+   */
+  getAllPlans(): Promise<TestPlan[]>;
+  
+  /**
    * Retrieves a TestPlan and all of its associated discovered components.
    * @param planId The ID of the test plan to retrieve.
    * @returns The complete test plan with components, or null if not found.

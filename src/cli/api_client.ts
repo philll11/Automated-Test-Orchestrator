@@ -1,7 +1,7 @@
 // src/cli/api_client.ts
 
 import axios from 'axios';
-import type { CliTestPlan, CliMapping, CliCredentialProfile, CliEnrichedTestExecutionResult  } from './types.js';
+import type { CliTestPlan, CliTestPlanSummary, CliMapping, CliCredentialProfile, CliEnrichedTestExecutionResult } from './types.js';
 import { config } from './config.js';
 
 const apiClient = axios.create({
@@ -58,6 +58,15 @@ export async function deleteCredentialProfile(profileName: string): Promise<void
 export async function initiateDiscovery(rootComponentId: string, credentialProfile: string): Promise<{ planId: string }> {
   const response = await apiClient.post('/test-plans', { rootComponentId, credentialProfile });
   return { planId: response.data.data.id };
+}
+
+/**
+ * Retrieves a summary list of all test plans.
+ * @returns An array of test plan summary objects.
+ */
+export async function getAllPlans(): Promise<CliTestPlanSummary[]> {
+  const response = await apiClient.get('/test-plans');
+  return response.data.data;
 }
 
 /** Fetches the current status of a test plan by its ID.
@@ -130,23 +139,23 @@ export async function pollForExecutionCompletion(planId: string): Promise<CliTes
  * @returns The newly created mapping object.
  */
 export async function createMapping(data: { mainComponentId: string; testComponentId: string; testComponentName?: string }): Promise<CliMapping> {
-    const response = await apiClient.post('/mappings', data);
-    return response.data.data;
+  const response = await apiClient.post('/mappings', data);
+  return response.data.data;
 }
 
 /** Retrieves all existing test mappings from the backend.
  * @returns An array of mapping objects.
  */
 export async function getAllMappings(): Promise<CliMapping[]> {
-    const response = await apiClient.get('/mappings');
-    return response.data.data;
+  const response = await apiClient.get('/mappings');
+  return response.data.data;
 }
 
 /** Deletes a test mapping by its unique ID.
  * @param mappingId The unique ID of the mapping to delete.
  */
 export async function deleteMapping(mappingId: string): Promise<void> {
-    await apiClient.delete(`/mappings/${mappingId}`);
+  await apiClient.delete(`/mappings/${mappingId}`);
 }
 
 // --- TEST EXECUTION RESULTS FUNCTIONS ---
@@ -167,6 +176,6 @@ export interface GetResultsFilters {
  * @returns An array of enriched test execution result objects.
  */
 export async function getExecutionResults(filters: GetResultsFilters): Promise<CliEnrichedTestExecutionResult[]> {
-    const response = await apiClient.get('/test-execution-results', { params: filters });
-    return response.data;
+  const response = await apiClient.get('/test-execution-results', { params: filters });
+  return response.data;
 }

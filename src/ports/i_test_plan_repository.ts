@@ -6,4 +6,5 @@ export interface ITestPlanRepository {
   save(testPlan: TestPlan): Promise<TestPlan>;
   findById(id: string): Promise<TestPlan | null>;
   update(testPlan: TestPlan): Promise<TestPlan>;
+  findAll(): Promise<TestPlan[]>;
 }

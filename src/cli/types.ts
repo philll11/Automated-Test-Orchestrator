@@ -39,6 +39,9 @@ export interface CliTestPlan {
   discoveredComponents: CliDiscoveredComponent[];
 }
 
+// Represents a summary of a Test Plan for the list view
+export type CliTestPlanSummary = Omit<CliTestPlan, 'discoveredComponents'>;
+
 // Represents a single mapping record for the new mappings commands
 export interface CliMapping {
     id: string;

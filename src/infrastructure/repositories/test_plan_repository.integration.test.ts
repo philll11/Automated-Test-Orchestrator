@@ -111,4 +111,31 @@ describe('TestPlanRepository Integration Tests', () => {
             expect(result.rows[0].failure_reason).toBe('API credentials invalid');
         });
     });
+
+    describe('findAll', () => {
+        it('should return all test plans, ordered by creation date descending', async () => {
+            // Arrange
+            const plan1: TestPlan = { id: uuidv4(), rootComponentId: 'root-1', status: 'COMPLETED', createdAt: new Date('2025-01-01'), updatedAt: new Date() };
+            const plan2: TestPlan = { id: uuidv4(), rootComponentId: 'root-2', status: 'DISCOVERY_FAILED', createdAt: new Date('2025-01-02'), updatedAt: new Date() };
+            await repository.save(plan1);
+            await repository.save(plan2);
+
+            // Act
+            const plans = await repository.findAll();
+
+            // Assert
+            expect(plans).toHaveLength(2);
+            // Verify the descending order
+            expect(plans[0].id).toBe(plan2.id);
+            expect(plans[1].id).toBe(plan1.id);
+        });
+
+        it('should return an empty array if no test plans exist', async () => {
+            // Act
+            const plans = await repository.findAll();
+
+            // Assert
+            expect(plans).toHaveLength(0);
+        });
+    });
 });

@@ -24,7 +24,7 @@ export function registerMappingsCommand(program: Command) {
                     'Mapping ID': m.id,
                     'Main Component ID': m.mainComponentId,
                     'Test Component ID': m.testComponentId,
-                    'Test Name': m.testComponentName || 'N/A',
+                    'Test Component Name': m.testComponentName || 'N/A',
                 }));
                 console.table(displayData);
             } catch (error: any) {

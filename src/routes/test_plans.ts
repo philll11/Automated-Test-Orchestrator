@@ -18,6 +18,7 @@ const testPlanController = container.get<TestPlanController>(TYPES.TestPlanContr
 
 // Define the routes and bind them to the controller methods
 // .bind() is crucial to ensure 'this' is correctly set inside the controller methods
+router.get('/', asyncHandler(testPlanController.getAllPlans.bind(testPlanController))); 
 router.post('/', asyncHandler(testPlanController.initiateDiscovery.bind(testPlanController)));
 router.get('/:planId', asyncHandler(testPlanController.getPlanAndComponents.bind(testPlanController)));
 router.post('/:planId/execute', asyncHandler(testPlanController.executeTests.bind(testPlanController)));
