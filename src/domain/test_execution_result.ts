@@ -3,9 +3,8 @@
 export interface TestExecutionResult {
   id: string;
   testPlanId: string; // FK to TestPlan
-  rootComponentId: string; // From the joined TestPlan
-  discoveredComponentId: string; // FK to DiscoveredComponent
-  componentName?: string; // From the joined DiscoveredComponent
+  planComponentId: string; // FK to PlanComponent
+  componentName?: string; // From the joined PlanComponent
   testComponentId: string;
   testComponentName?: string; // From a joined Mapping
   status: 'SUCCESS' | 'FAILURE';

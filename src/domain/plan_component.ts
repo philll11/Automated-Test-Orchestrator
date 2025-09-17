@@ -1,6 +1,6 @@
-// src/domain/discovered_component.ts
+// src/domain/plan_component.ts
 
-export interface DiscoveredComponent {
+export interface PlanComponent {
   id: string;
   testPlanId: string;
   componentId: string;

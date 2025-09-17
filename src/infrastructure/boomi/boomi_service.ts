@@ -112,6 +112,18 @@ export class BoomiService implements IIntegrationPlatformService {
         }
     }
 
+    public async getComponentInfo(componentId: string): Promise<ComponentInfo | null> {
+        const metadata = await this.getComponentMetadata(componentId);
+        if (metadata === null) return null;
+
+        return {
+            id: componentId,
+            name: metadata.name,
+            type: metadata.type,
+            dependencyIds: []
+        };
+    }
+
     public async getComponentInfoAndDependencies(componentId: string): Promise<ComponentInfo | null> {
         const metadata = await this.getComponentMetadata(componentId);
         if (metadata === null) return null; // Component not found, return null

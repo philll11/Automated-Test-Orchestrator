@@ -25,7 +25,8 @@ import { ITestPlanService } from './ports/i_test_plan_service.js';
 import { IMappingService } from './ports/i_mapping_service.js';
 import { ITestExecutionResultService } from './ports/i_test_execution_result_service.js';
 import { ITestPlanRepository } from './ports/i_test_plan_repository.js';
-import { IDiscoveredComponentRepository } from './ports/i_discovered_component_repository.js';
+import { ITestPlanEntryPointRepository } from './ports/i_test_plan_entry_point_repository.js';
+import { IPlanComponentRepository } from './ports/i_plan_component_repository.js';
 import { IIntegrationPlatformServiceFactory } from './ports/i_integration_platform_service_factory.js';
 import { IMappingRepository } from './ports/i_mapping_repository.js';
 import { ITestExecutionResultRepository } from './ports/i_test_execution_result_repository.js';
@@ -33,7 +34,8 @@ import { ITestExecutionResultRepository } from './ports/i_test_execution_result_
 // Import Infrastructure Adapters
 import globalPool from './infrastructure/database.js';
 import { TestPlanRepository } from './infrastructure/repositories/test_plan_repository.js';
-import { DiscoveredComponentRepository } from './infrastructure/repositories/discovered_component_repository.js';
+import { TestPlanEntryPointRepository } from './infrastructure/repositories/test_plan_entry_point_repository.js';
+import { PlanComponentRepository } from './infrastructure/repositories/plan_component_repository.js';
 import { MappingRepository } from './infrastructure/repositories/mapping_repository.js';
 import { TestExecutionResultRepository } from './infrastructure/repositories/test_execution_result_repository.js';
 import { IntegrationPlatformServiceFactory } from './infrastructure/integration_platform_service_factory.js';
@@ -54,7 +56,8 @@ container.bind<TestExecutionResultsController>(TYPES.TestExecutionResultsControl
 
 // --- Repository Bindings ---
 container.bind<ITestPlanRepository>(TYPES.ITestPlanRepository).to(TestPlanRepository).inSingletonScope();
-container.bind<IDiscoveredComponentRepository>(TYPES.IDiscoveredComponentRepository).to(DiscoveredComponentRepository).inSingletonScope();
+container.bind<IPlanComponentRepository>(TYPES.IPlanComponentRepository).to(PlanComponentRepository).inSingletonScope();
+container.bind<ITestPlanEntryPointRepository>(TYPES.ITestPlanEntryPointRepository).to(TestPlanEntryPointRepository).inSingletonScope();
 container.bind<IMappingRepository>(TYPES.IMappingRepository).to(MappingRepository).inSingletonScope();
 container.bind<ITestExecutionResultRepository>(TYPES.ITestExecutionResultRepository).to(TestExecutionResultRepository).inSingletonScope();
 

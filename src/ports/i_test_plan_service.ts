@@ -1,16 +1,16 @@
 // src/ports/i_test_plan_service.ts
 
 import { TestPlan } from "../domain/test_plan.js";
-import { DiscoveredComponent } from '../domain/discovered_component.js';
+import { PlanComponent } from '../domain/plan_component.js';
 import { TestExecutionResult } from "../domain/test_execution_result.js";
 
-export type DiscoveredComponentDetails = DiscoveredComponent & {
+export type PlanComponentDetails = PlanComponent & {
   availableTests: string[];
   executionResults: TestExecutionResult[];
 };
 
 export type TestPlanWithDetails = TestPlan & {
-  discoveredComponents: DiscoveredComponentDetails[];
+  planComponents: PlanComponentDetails[];
 };
 
 export interface ITestPlanService {
@@ -21,19 +21,20 @@ export interface ITestPlanService {
   getAllPlans(): Promise<TestPlan[]>;
   
   /**
-   * Retrieves a TestPlan and all of its associated discovered components.
+   * Retrieves a TestPlan and all of its associated components.
    * @param planId The ID of the test plan to retrieve.
    * @returns The complete test plan with components, or null if not found.
    */
   getPlanWithDetails(planId: string): Promise<TestPlanWithDetails | null>;
 
   /**
-   * Initiates the asynchronous discovery of a component's dependency tree.
-   * @param rootComponentId The starting component ID.
+   * Initiates the asynchronous creation of a new test plan.
+   * @param componentIds An array of one or more component IDs to seed the plan.
    * @param credentialProfile The name of the credential profile to use for authentication.
+   * @param discoverDependencies If true, recursively finds all dependencies.
    * @returns A new TestPlan in a 'DISCOVERING' state.
    */
-  initiateDiscovery(rootComponentId: string, credentialProfile: string): Promise<TestPlan>;
+  initiateDiscovery(componentIds: string[], credentialProfile: string, discoverDependencies: boolean): Promise<TestPlan>;
 
   /**
    * Executes a selected list of tests for a given test plan.

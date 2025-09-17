@@ -3,11 +3,11 @@
 import { TestExecutionResult } from "../domain/test_execution_result.js";
 
 // This type is for creating a new record. The enriched fields are for reading.
-export type NewTestExecutionResult = Omit<TestExecutionResult, 'id' | 'executedAt' | 'rootComponentId' | 'componentName' | 'testComponentName'>;
+export type NewTestExecutionResult = Omit<TestExecutionResult, 'id' | 'executedAt' | 'componentName' | 'testComponentName'>;
 
 export interface TestExecutionResultFilters {
   testPlanId?: string;
-  discoveredComponentId?: string;
+  planComponentId?: string;
   testComponentId?: string;
   status?: 'SUCCESS' | 'FAILURE';
 }
@@ -20,10 +20,10 @@ export interface ITestExecutionResultRepository {
   save(newResult: NewTestExecutionResult): Promise<TestExecutionResult>;
 
   /**
-   * Finds all test execution results for a given set of discovered component IDs.
-   * @param discoveredComponentIds An array of discovered component UUIDs.
+   * Finds all test execution results for a given set of plan component IDs.
+   * @param planComponentIds An array of plan component UUIDs.
    */
-  findByDiscoveredComponentIds(discoveredComponentIds: string[]): Promise<TestExecutionResult[]>;
+  findByPlanComponentIds(planComponentIds: string[]): Promise<TestExecutionResult[]>;
 
   /**
    * Finds all test execution results matching the provided filters.

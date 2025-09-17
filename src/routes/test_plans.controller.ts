@@ -54,9 +54,9 @@ export class TestPlanController {
      * @swagger
      * /api/v1/test-plans:
      *   post:
-     *     summary: Initiate Discovery
+     *     summary: Create a new Test Plan
      *     tags: [Test Plans]
-     *     description: Initiates a new run by providing a root Component ID and a credential profile name. The discovery process runs asynchronously.
+     *     description: Creates a new test plan from a list of components. The creation process runs asynchronously. Set `discoverDependencies` to true to recursively find all dependencies for the provided components.
      *     requestBody:
      *       required: true
      *       content:
@@ -64,32 +64,45 @@ export class TestPlanController {
      *           schema:
      *             type: object
      *             required:
-     *               - rootComponentId
+     *               - componentIds
      *               - credentialProfile
      *             properties:
-     *               rootComponentId:
-     *                 type: string
-     *                 example: "2582515a-40fb-4d5d-bcc9-10817caa4fa2"
+     *               componentIds:
+     *                 type: array
+     *                 items:
+     *                   type: string
+     *                 description: "An array of one or more component IDs to include in the plan."
+     *                 example: ["2582515a-40fb-4d5d-bcc9-10817caa4fa2", "a1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6"]
      *               credentialProfile:
      *                 type: string
+     *                 description: "The name of the credential profile to use."
      *                 example: "dev-account"
+     *               discoverDependencies:
+     *                 type: boolean
+     *                 description: "If true, the system will discover all dependencies for the provided componentIds. Defaults to false."
+     *                 example: false
      *     responses:
      *       '202':
-     *         description: Accepted. The discovery process has been initiated.
+     *         description: Accepted. The test plan creation process has been initiated.
      *         content:
      *           application/json:
      *             schema:
      *               $ref: '#/components/schemas/ApiResponse_TestPlan'
      *       '400':
-     *         description: Bad Request. Missing required fields.
+     *         description: Bad Request. Missing or invalid required fields.
      */
     public async initiateDiscovery(req: Request, res: Response): Promise<void> {
-        const { rootComponentId, credentialProfile } = req.body;
-        if (!rootComponentId || !credentialProfile) {
-            throw new BadRequestError('rootComponentId and credentialProfile are required');
+        const { componentIds, credentialProfile, discoverDependencies } = req.body;
+
+        if (!credentialProfile || !Array.isArray(componentIds) || componentIds.length === 0) {
+            throw new BadRequestError('credentialProfile and a non-empty componentIds array are required');
         }
 
-        const testPlan = await this.testPlanService.initiateDiscovery(rootComponentId, credentialProfile);
+        const testPlan = await this.testPlanService.initiateDiscovery(
+            componentIds,
+            credentialProfile,
+            discoverDependencies ?? false // Default to false if undefined
+        );
 
         res.status(202).json({
             metadata: { code: 202, message: 'Accepted' },

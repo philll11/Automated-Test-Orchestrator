@@ -13,12 +13,12 @@ export class TestExecutionResultRepository implements ITestExecutionResultReposi
     constructor(@inject(TYPES.PostgresPool) private pool: Pool) {}
 
     async save(newResult: NewTestExecutionResult): Promise<TestExecutionResult> {
-        const { testPlanId, discoveredComponentId, testComponentId, status, log } = newResult;
+        const { testPlanId, planComponentId, testComponentId, status, log } = newResult;
 
-        const result: Omit<TestExecutionResult, 'rootComponentId' | 'componentName' | 'testComponentName'> = {
+        const result = {
             id: uuidv4(),
             testPlanId,
-            discoveredComponentId,
+            planComponentId,
             testComponentId,
             status,
             log,
@@ -26,19 +26,19 @@ export class TestExecutionResultRepository implements ITestExecutionResultReposi
         };
 
         const query = `
-            INSERT INTO test_execution_results (id, test_plan_id, discovered_component_id, test_component_id, status, log, executed_at)
+            INSERT INTO test_execution_results (id, test_plan_id, plan_component_id, test_component_id, status, log, executed_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *;
         `;
-        const values = [result.id, result.testPlanId, result.discoveredComponentId, result.testComponentId, result.status, result.log, result.executedAt];
+        const values = [result.id, result.testPlanId, result.planComponentId, result.testComponentId, result.status, result.log, result.executedAt];
         
         const dbResult = await this.pool.query(query, values);
         
-        return rowToTestExecutionResult(dbResult.rows[0]) as TestExecutionResult;
+        return rowToTestExecutionResult(dbResult.rows[0]);
     }
 
-    async findByDiscoveredComponentIds(discoveredComponentIds: string[]): Promise<TestExecutionResult[]> {
-        if (discoveredComponentIds.length === 0) {
+    async findByPlanComponentIds(planComponentIds: string[]): Promise<TestExecutionResult[]> {
+        if (planComponentIds.length === 0) {
             return [];
         }
         
@@ -46,7 +46,7 @@ export class TestExecutionResultRepository implements ITestExecutionResultReposi
             SELECT
                 ter.id,
                 ter.test_plan_id,
-                ter.discovered_component_id,
+                ter.plan_component_id,
                 ter.test_component_id,
                 ter.status,
                 ter.log,
@@ -55,13 +55,13 @@ export class TestExecutionResultRepository implements ITestExecutionResultReposi
                 dc.component_name,
                 m.test_component_name
             FROM test_execution_results ter
-            INNER JOIN discovered_components dc ON ter.discovered_component_id = dc.id
+            INNER JOIN discovered_components dc ON ter.plan_component_id = dc.id
             INNER JOIN test_plans tp ON ter.test_plan_id = tp.id
             LEFT JOIN mappings m ON dc.component_id = m.main_component_id AND ter.test_component_id = m.test_component_id
-            WHERE ter.discovered_component_id = ANY($1::uuid[])
+            WHERE ter.plan_component_id = ANY($1::uuid[])
             ORDER BY ter.executed_at ASC;
         `;
-        const result = await this.pool.query(query, [discoveredComponentIds]);
+        const result = await this.pool.query(query, [planComponentIds]);
         return result.rows.map(rowToTestExecutionResult);
     }
 
@@ -74,9 +74,9 @@ export class TestExecutionResultRepository implements ITestExecutionResultReposi
             conditions.push(`ter.test_plan_id = $${paramIndex++}`);
             values.push(filters.testPlanId);
         }
-        if (filters.discoveredComponentId) {
-            conditions.push(`ter.discovered_component_id = $${paramIndex++}`);
-            values.push(filters.discoveredComponentId);
+        if (filters.planComponentId) {
+            conditions.push(`ter.plan_component_id = $${paramIndex++}`);
+            values.push(filters.planComponentId);
         }
         if (filters.testComponentId) {
             conditions.push(`ter.test_component_id = $${paramIndex++}`);
@@ -96,7 +96,7 @@ export class TestExecutionResultRepository implements ITestExecutionResultReposi
             SELECT
                 ter.id,
                 ter.test_plan_id,
-                ter.discovered_component_id,
+                ter.plan_component_id,
                 ter.test_component_id,
                 ter.status,
                 ter.log,
@@ -105,7 +105,7 @@ export class TestExecutionResultRepository implements ITestExecutionResultReposi
                 dc.component_name,
                 m.test_component_name
             FROM test_execution_results ter
-            INNER JOIN discovered_components dc ON ter.discovered_component_id = dc.id
+            INNER JOIN discovered_components dc ON ter.plan_component_id = dc.id
             INNER JOIN test_plans tp ON ter.test_plan_id = tp.id
             LEFT JOIN mappings m ON dc.component_id = m.main_component_id AND ter.test_component_id = m.test_component_id
             WHERE ${whereClause}

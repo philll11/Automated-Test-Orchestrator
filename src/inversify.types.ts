@@ -20,7 +20,8 @@ export const TYPES = {
     
     // Repositories
     ITestPlanRepository: Symbol.for('ITestPlanRepository'),
-    IDiscoveredComponentRepository: Symbol.for('IDiscoveredComponentRepository'),
+    ITestPlanEntryPointRepository: Symbol.for('ITestPlanEntryPointRepository'),
+    IPlanComponentRepository: Symbol.for('IPlanComponentRepository'),
     IMappingRepository: Symbol.for('IMappingRepository'),
     ITestExecutionResultRepository: Symbol.for('ITestExecutionResultRepository'),
     

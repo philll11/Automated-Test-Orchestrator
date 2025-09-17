@@ -1,7 +1,7 @@
 // src/infrastructure/mappers.ts
 
 import { TestPlan } from '../domain/test_plan.js';
-import { DiscoveredComponent } from '../domain/discovered_component.js';
+import { PlanComponent } from '../domain/plan_component.js';
 import { Mapping } from '../domain/mapping.js';
 import { TestExecutionResult } from '../domain/test_execution_result.js';
 
@@ -14,7 +14,6 @@ export function rowToTestPlan(row: any): TestPlan {
   if (!row) return row;
   return {
     id: row.id,
-    rootComponentId: row.root_component_id,
     status: row.status,
     failureReason: row.failure_reason,
     createdAt: row.created_at,
@@ -23,11 +22,11 @@ export function rowToTestPlan(row: any): TestPlan {
 }
 
 /**
- * Maps a raw database row from the 'discovered_components' table to a DiscoveredComponent domain object.
+ * Maps a raw database row from the 'plan_components' table to a PlanComponent domain object.
  * @param row The raw row object from the database (snake_case).
- * @returns A DiscoveredComponent object (camelCase).
+ * @returns A PlanComponent object (camelCase).
  */
-export function rowToDiscoveredComponent(row: any): DiscoveredComponent {
+export function rowToPlanComponent(row: any): PlanComponent {
   if (!row) return row;
   return {
     id: row.id,
@@ -68,8 +67,7 @@ export function rowToTestExecutionResult(row: any): TestExecutionResult {
   return {
     id: row.id,
     testPlanId: row.test_plan_id,
-    rootComponentId: row.root_component_id,
-    discoveredComponentId: row.discovered_component_id,
+    planComponentId: row.plan_component_id,
     componentName: row.component_name,
     testComponentId: row.test_component_id,
     testComponentName: row.test_component_name,
