@@ -14,15 +14,15 @@ export class TestExecutionResultsController {
 
     async getResults(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const { testPlanId, discoveredComponentId, testComponentId, status } = req.query;
+            const { testPlanId, planComponentId, testComponentId, status } = req.query;
 
             const filters: TestExecutionResultFilters = {};
 
             if (testPlanId && typeof testPlanId === 'string') {
                 filters.testPlanId = testPlanId;
             }
-            if (discoveredComponentId && typeof discoveredComponentId === 'string') {
-                filters.discoveredComponentId = discoveredComponentId;
+            if (planComponentId && typeof planComponentId === 'string') {
+                filters.planComponentId = planComponentId;
             }
             if (testComponentId && typeof testComponentId === 'string') {
                 filters.testComponentId = testComponentId;

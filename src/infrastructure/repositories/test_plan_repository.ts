@@ -9,17 +9,17 @@ import { TYPES } from '../../inversify.types.js';
 
 @injectable()
 export class TestPlanRepository implements ITestPlanRepository {
-    
-    constructor(@inject(TYPES.PostgresPool) private pool: Pool) {}
+
+    constructor(@inject(TYPES.PostgresPool) private pool: Pool) { }
 
     async save(testPlan: TestPlan): Promise<TestPlan> {
-        const { id, rootComponentId, status, createdAt, updatedAt } = testPlan;
+        const { id, status, createdAt, updatedAt } = testPlan;
         const query = `
-            INSERT INTO test_plans (id, root_component_id, status, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO test_plans (id, status, created_at, updated_at)
+            VALUES ($1, $2, $3, $4)
             RETURNING *;
         `;
-        const values = [id, rootComponentId, status, createdAt, updatedAt];
+        const values = [id, status, createdAt, updatedAt];
         const result = await this.pool.query(query, values);
         return rowToTestPlan(result.rows[0]);
     }
@@ -44,7 +44,7 @@ export class TestPlanRepository implements ITestPlanRepository {
 
         return rowToTestPlan(result.rows[0]);
     }
-        async findAll(): Promise<TestPlan[]> {
+    async findAll(): Promise<TestPlan[]> {
         const query = 'SELECT * FROM test_plans ORDER BY created_at DESC;';
         const result = await this.pool.query(query);
         return result.rows.map(rowToTestPlan);

@@ -3,7 +3,7 @@
 import type { Command } from 'commander';
 import ora from 'ora';
 import chalk from 'chalk';
-import { initiateExecution, pollForExecutionCompletion, PlanFailedError } from '../api_client.js';
+import { initiateExecution, pollForExecutionCompletion } from '../api_client.js';
 import { handleCliError } from '../error_handler.js';
 
 export function registerExecuteCommand(program: Command) {
@@ -32,9 +32,7 @@ export function registerExecuteCommand(program: Command) {
 
         console.log('\n--- Test Execution Report ---');
 
-        // Create a map for easy lookup of component info
-        const componentMap = new Map(finalPlan.discoveredComponents.map(c => [c.id, c]));
-        const allResults = finalPlan.discoveredComponents.flatMap(c => c.executionResults);
+        const allResults = finalPlan.planComponents.flatMap(c => c.executionResults);
 
         if (allResults.length === 0) {
           console.log(chalk.yellow('No tests were executed. Ensure the test IDs provided are correct.'));

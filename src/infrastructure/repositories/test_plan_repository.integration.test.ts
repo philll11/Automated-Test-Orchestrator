@@ -31,16 +31,14 @@ describe('TestPlanRepository Integration Tests', () => {
     });
 
     afterAll(async () => {
-        // We no longer need to close the globalPool here as it's not used in this test.
         await testPool.end();
     });
 
     describe('save', () => {
         it('should correctly save a new TestPlan to the database', async () => {
-            // Arrange: Use a valid new status
+            // Arrange
             const testPlan: TestPlan = {
                 id: uuidv4(),
-                rootComponentId: 'comp-root-1',
                 status: 'DISCOVERING',
                 createdAt: new Date(),
                 updatedAt: new Date(),
@@ -53,15 +51,16 @@ describe('TestPlanRepository Integration Tests', () => {
             expect(savedPlan.status).toBe('DISCOVERING');
             const result = await testPool.query('SELECT * FROM test_plans WHERE id = $1', [testPlan.id]);
             expect(result.rowCount).toBe(1);
+            // Verify that the root_component_id column does not exist and wasn't saved
+            expect(result.rows[0].root_component_id).toBeUndefined();
         });
     });
 
     describe('findById', () => {
         it('should return a TestPlan if one exists with the given id', async () => {
-            // Arrange: Use a valid new status
+            // Arrange
             const testPlan: TestPlan = {
                 id: uuidv4(),
-                rootComponentId: 'comp-root-2',
                 status: 'AWAITING_SELECTION',
                 createdAt: new Date(),
                 updatedAt: new Date(),
@@ -84,17 +83,16 @@ describe('TestPlanRepository Integration Tests', () => {
 
     describe('update', () => {
         it('should update the status and failureReason of an existing TestPlan', async () => {
-            // Arrange: Use a valid new status
+            // Arrange
             const initialPlan: TestPlan = {
                 id: uuidv4(),
-                rootComponentId: 'comp-root-3',
                 status: 'DISCOVERING',
                 createdAt: new Date(),
                 updatedAt: new Date(),
             };
             await repository.save(initialPlan);
 
-            // Act: Update to a valid new status
+            // Act
             const planToUpdate = (await repository.findById(initialPlan.id))!;
             planToUpdate.status = 'DISCOVERY_FAILED';
             planToUpdate.failureReason = 'API credentials invalid';
@@ -105,7 +103,6 @@ describe('TestPlanRepository Integration Tests', () => {
             expect(updatedPlan.status).toBe('DISCOVERY_FAILED');
             expect(updatedPlan.failureReason).toBe('API credentials invalid');
 
-            // Verify directly against the database
             const result = await testPool.query('SELECT status, failure_reason FROM test_plans WHERE id = $1', [initialPlan.id]);
             expect(result.rows[0].status).toBe('DISCOVERY_FAILED');
             expect(result.rows[0].failure_reason).toBe('API credentials invalid');
@@ -114,9 +111,8 @@ describe('TestPlanRepository Integration Tests', () => {
 
     describe('findAll', () => {
         it('should return all test plans, ordered by creation date descending', async () => {
-            // Arrange
-            const plan1: TestPlan = { id: uuidv4(), rootComponentId: 'root-1', status: 'COMPLETED', createdAt: new Date('2025-01-01'), updatedAt: new Date() };
-            const plan2: TestPlan = { id: uuidv4(), rootComponentId: 'root-2', status: 'DISCOVERY_FAILED', createdAt: new Date('2025-01-02'), updatedAt: new Date() };
+            const plan1: TestPlan = { id: uuidv4(), status: 'COMPLETED', createdAt: new Date('2025-01-01'), updatedAt: new Date() };
+            const plan2: TestPlan = { id: uuidv4(), status: 'DISCOVERY_FAILED', createdAt: new Date('2025-01-02'), updatedAt: new Date() };
             await repository.save(plan1);
             await repository.save(plan2);
 
@@ -125,7 +121,6 @@ describe('TestPlanRepository Integration Tests', () => {
 
             // Assert
             expect(plans).toHaveLength(2);
-            // Verify the descending order
             expect(plans[0].id).toBe(plan2.id);
             expect(plans[1].id).toBe(plan1.id);
         });

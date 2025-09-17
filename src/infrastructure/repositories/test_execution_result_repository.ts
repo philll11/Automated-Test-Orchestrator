@@ -44,20 +44,13 @@ export class TestExecutionResultRepository implements ITestExecutionResultReposi
         
         const query = `
             SELECT
-                ter.id,
-                ter.test_plan_id,
-                ter.plan_component_id,
-                ter.test_component_id,
-                ter.status,
-                ter.log,
-                ter.executed_at,
-                tp.root_component_id,
-                dc.component_name,
+                ter.id, ter.test_plan_id, ter.plan_component_id, ter.test_component_id,
+                ter.status, ter.log, ter.executed_at,
+                pc.component_name,
                 m.test_component_name
             FROM test_execution_results ter
-            INNER JOIN discovered_components dc ON ter.plan_component_id = dc.id
-            INNER JOIN test_plans tp ON ter.test_plan_id = tp.id
-            LEFT JOIN mappings m ON dc.component_id = m.main_component_id AND ter.test_component_id = m.test_component_id
+            INNER JOIN plan_components pc ON ter.plan_component_id = pc.id
+            LEFT JOIN mappings m ON pc.component_id = m.main_component_id AND ter.test_component_id = m.test_component_id
             WHERE ter.plan_component_id = ANY($1::uuid[])
             ORDER BY ter.executed_at ASC;
         `;
@@ -94,20 +87,13 @@ export class TestExecutionResultRepository implements ITestExecutionResultReposi
         const whereClause = conditions.join(' AND ');
         const query = `
             SELECT
-                ter.id,
-                ter.test_plan_id,
-                ter.plan_component_id,
-                ter.test_component_id,
-                ter.status,
-                ter.log,
-                ter.executed_at,
-                tp.root_component_id,
-                dc.component_name,
+                ter.id, ter.test_plan_id, ter.plan_component_id, ter.test_component_id,
+                ter.status, ter.log, ter.executed_at,
+                pc.component_name,
                 m.test_component_name
             FROM test_execution_results ter
-            INNER JOIN discovered_components dc ON ter.plan_component_id = dc.id
-            INNER JOIN test_plans tp ON ter.test_plan_id = tp.id
-            LEFT JOIN mappings m ON dc.component_id = m.main_component_id AND ter.test_component_id = m.test_component_id
+            INNER JOIN plan_components pc ON ter.plan_component_id = pc.id
+            LEFT JOIN mappings m ON pc.component_id = m.main_component_id AND ter.test_component_id = m.test_component_id
             WHERE ${whereClause}
             ORDER BY ter.executed_at ASC;
         `;

@@ -7,7 +7,7 @@ import { TestExecutionResult } from '../domain/test_execution_result.js';
 // --- JEST MOCK FOR THE REPOSITORY PORT ---
 const mockResultRepo: jest.Mocked<ITestExecutionResultRepository> = {
     save: jest.fn(),
-    findByDiscoveredComponentIds: jest.fn(),
+    findByPlanComponentIds: jest.fn(),
     findByFilters: jest.fn(),
 };
 
@@ -27,8 +27,14 @@ describe('TestExecutionResultService', () => {
                 status: 'FAILURE',
             };
             const mockResults: TestExecutionResult[] = [
-                // We only need to mock the shape, not the full data for this test
-                { id: 'res-1', testPlanId: 'plan-123', rootComponentId: 'root', discoveredComponentId: 'dc-1', testComponentId: 'test-A', status: 'FAILURE', executedAt: new Date() }
+                { 
+                    id: 'res-1', 
+                    testPlanId: 'plan-123', 
+                    planComponentId: 'pc-1', 
+                    testComponentId: 'test-A', 
+                    status: 'FAILURE', 
+                    executedAt: new Date() 
+                }
             ];
             mockResultRepo.findByFilters.mockResolvedValue(mockResults);
 

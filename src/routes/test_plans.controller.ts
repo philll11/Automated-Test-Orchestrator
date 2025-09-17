@@ -5,7 +5,6 @@ import { injectable, inject } from 'inversify';
 import { TYPES } from '../inversify.types.js';
 import { ITestPlanService } from '../ports/i_test_plan_service.js';
 import { BadRequestError, NotFoundError } from '../utils/app_error.js';
-// REMOVED: The controller no longer has knowledge of the specific integration platform implementation.
 
 @injectable()
 export class TestPlanController {

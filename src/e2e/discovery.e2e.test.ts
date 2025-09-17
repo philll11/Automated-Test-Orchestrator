@@ -9,23 +9,21 @@ import { v4 as uuidv4 } from 'uuid';
 
 const BOOMI_API_BASE = 'https://api.boomi.com';
 
-describe('Discovery End-to-End Test', () => {
+describe('Discovery End-to-End Tests (POST /api/v1/test-plans)', () => {
     let testPool: pg.Pool;
-    const testProfileName = 'e2e-test-profile';
+    const testProfileName = 'e2e-discovery-profile';
     const credentials = {
         accountId: 'test-account-e2e',
         username: 'testuser',
         passwordOrToken: 'testpass',
         executionInstanceId: 'atom-e2e'
     };
+    const baseApiUrl = `/api/rest/v1/${credentials.accountId}`;
 
     beforeAll(() => {
         testPool = new pg.Pool({
-            user: process.env.DB_USER,
-            host: process.env.DB_HOST,
-            database: process.env.DB_NAME,
-            password: process.env.DB_PASSWORD,
-            port: parseInt(process.env.DB_PORT || '5433', 10),
+            user: process.env.DB_USER, host: process.env.DB_HOST, database: process.env.DB_NAME,
+            password: process.env.DB_PASSWORD, port: parseInt(process.env.DB_PORT || '5433', 10),
         });
     });
 
@@ -34,8 +32,7 @@ describe('Discovery End-to-End Test', () => {
         await testPool.query('TRUNCATE TABLE mappings RESTART IDENTITY CASCADE');
         nock.cleanAll();
 
-        // Create the credential profile required for the test via the API.
-        // This is a critical setup step for the new workflow.
+        // Create the credential profile required for all tests in this suite
         await request(app)
             .post('/api/v1/credentials')
             .send({ profileName: testProfileName, ...credentials })
@@ -43,21 +40,59 @@ describe('Discovery End-to-End Test', () => {
     });
 
     afterEach(async () => {
-        await request(app).delete(`/api/v1/credentials/${testProfileName}`).expect(204); // Clean up the created profile
+        // Clean up the created profile after each test
+        await request(app).delete(`/api/v1/credentials/${testProfileName}`).expect(204);
     });
 
-    // --- UPDATED afterAll block ---
     afterAll(async () => {
         await testPool.end();
-        await globalPool.end(); // Ensure the global pool is also closed
+        await globalPool.end();
     });
 
-    it('should successfully initiate discovery and retrieve the detailed plan', async () => {
+    it('Direct Mode: should create a plan with only the specified components when discoverDependencies is false', async () => {
         // --- Arrange ---
-        const rootComponentId = 'root-e2e-123';
+        const componentIds = ['comp-e2e-A', 'comp-e2e-B'];
+        const requestBody = { componentIds, credentialProfile: testProfileName, discoverDependencies: false };
+
+        await testPool.query(
+            'INSERT INTO mappings (id, main_component_id, test_component_id, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW())',
+            [uuidv4(), 'comp-e2e-B', 'test-for-B']
+        );
+
+        // Nock should be called for metadata for EACH component provided
+        const boomiScope = nock(BOOMI_API_BASE)
+            .get(`${baseApiUrl}/ComponentMetadata/comp-e2e-A`).reply(200, { name: 'Comp A', type: 'PROCESS' })
+            .get(`${baseApiUrl}/ComponentMetadata/comp-e2e-B`).reply(200, { name: 'Comp B', type: 'API' });
+
+        // --- Act ---
+        const initialResponse = await request(app).post('/api/v1/test-plans').send(requestBody).expect(202);
+        const planId = initialResponse.body.data.id;
+        expect(initialResponse.body.data.status).toBe('DISCOVERING');
+
+        await new Promise(resolve => setTimeout(resolve, 500)); // Wait for async processing
+
+        // --- Assert ---
+        const planResult = await testPool.query('SELECT status FROM test_plans WHERE id = $1', [planId]);
+        expect(planResult.rows[0].status).toBe('AWAITING_SELECTION');
+
+        const componentsResult = await testPool.query('SELECT component_id FROM plan_components WHERE test_plan_id = $1', [planId]);
+        expect(componentsResult.rowCount).toBe(2);
+
+        const detailsResponse = await request(app).get(`/api/v1/test-plans/${planId}`).expect(200);
+        const planDetails = detailsResponse.body.data;
+        expect(planDetails.planComponents).toHaveLength(2);
+        const compADetails = planDetails.planComponents.find((c: any) => c.componentId === 'comp-e2e-A');
+        const compBDetails = planDetails.planComponents.find((c: any) => c.componentId === 'comp-e2e-B');
+        expect(compADetails.availableTests).toEqual([]);
+        expect(compBDetails.availableTests).toEqual(['test-for-B']);
+        expect(boomiScope.isDone()).toBe(true);
+    });
+
+    it('Recursive Mode: should discover all dependencies when discoverDependencies is true', async () => {
+        // --- Arrange ---
+        const componentIds = ['root-e2e-123'];
         const childComponentId = 'child-e2e-456';
-        const baseApiUrl = `/api/rest/v1/${credentials.accountId}`;
-        const requestBody = { rootComponentId, credentialProfile: testProfileName };
+        const requestBody = { componentIds, credentialProfile: testProfileName, discoverDependencies: true };
 
         await testPool.query(
             'INSERT INTO mappings (id, main_component_id, test_component_id, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW())',
@@ -65,44 +100,53 @@ describe('Discovery End-to-End Test', () => {
         );
 
         const boomiScope = nock(BOOMI_API_BASE)
-            // 1. Get metadata for the root component
-            .get(`${baseApiUrl}/ComponentMetadata/${rootComponentId}`)
-            .reply(200, { name: 'E2E Root Component', version: 1, type: 'PROCESS' })
-            // 2. Query for root component's dependencies
-            .post(`${baseApiUrl}/ComponentReference/query`)
-            .reply(200, { numberOfResults: 1, result: [{ references: [{ componentId: childComponentId }] }] })
-            // 3. Get metadata for the child component
-            .get(`${baseApiUrl}/ComponentMetadata/${childComponentId}`)
-            .reply(200, { name: 'E2E Child Component', version: 5, type: 'PROCESS' })
-            // 4. Query for child component's dependencies (finds none)
-            .post(`${baseApiUrl}/ComponentReference/query`)
-            .reply(200, { numberOfResults: 0, result: [] });
+            .get(`${baseApiUrl}/ComponentMetadata/${componentIds[0]}`).reply(200, { name: 'E2E Root', version: 1, type: 'PROCESS' })
+            .post(`${baseApiUrl}/ComponentReference/query`).reply(200, { numberOfResults: 1, result: [{ references: [{ componentId: childComponentId }] }] })
+            .get(`${baseApiUrl}/ComponentMetadata/${childComponentId}`).reply(200, { name: 'E2E Child', version: 1, type: 'SUBPROCESS' })
+            .post(`${baseApiUrl}/ComponentReference/query`).reply(200, { numberOfResults: 0 });
 
-        // --- Act & Assert (Phase 1: Initial API Call) ---
+        // --- Act & Assert ---
         const initialResponse = await request(app).post('/api/v1/test-plans').send(requestBody).expect(202);
         const planId = initialResponse.body.data.id;
-        expect(initialResponse.body.data.status).toBe('DISCOVERING');
-
-        // --- Wait for async background process ---
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        // --- Assert (Phase 2: Database State) ---
-        const planResult = await testPool.query('SELECT status FROM test_plans WHERE id = $1', [planId]);
-        expect(planResult.rowCount).toBe(1);
-        expect(planResult.rows[0].status).toBe('AWAITING_SELECTION');
-
-        const componentsResult = await testPool.query('SELECT component_id, component_name FROM discovered_components WHERE test_plan_id = $1', [planId]);
-        expect(componentsResult.rowCount).toBe(2);
-
-        // --- Assert (Phase 3: GET Plan Details) ---
         const detailsResponse = await request(app).get(`/api/v1/test-plans/${planId}`).expect(200);
         const planDetails = detailsResponse.body.data;
-        const rootDetails = planDetails.discoveredComponents.find((c: any) => c.componentId === rootComponentId);
-        const childDetails = planDetails.discoveredComponents.find((c: any) => c.componentId === childComponentId);
+        expect(planDetails.planComponents).toHaveLength(2);
+        const childDetails = planDetails.planComponents.find((c: any) => c.componentId === childComponentId);
+        expect(childDetails.availableTests).toEqual(['test-for-child-e2e']);
+        expect(boomiScope.isDone()).toBe(true);
+    });
+
+    it('Recursive Mode: should correctly deduplicate shared dependencies', async () => {
+        // --- Arrange ---
+        const rootA = 'root-A';
+        const rootB = 'root-B';
+        const sharedChild = 'shared-child';
+        const requestBody = { componentIds: [rootA, rootB], credentialProfile: testProfileName, discoverDependencies: true };
+
+        const boomiScope = nock(BOOMI_API_BASE)
+            // Discovery for Root A
+            .get(`${baseApiUrl}/ComponentMetadata/${rootA}`).reply(200, { name: 'Root A', version: 1, type: 'PROCESS' })
+            .post(`${baseApiUrl}/ComponentReference/query`).reply(200, { numberOfResults: 1, result: [{ references: [{ componentId: sharedChild }] }] })
+            // Discovery for Root B
+            .get(`${baseApiUrl}/ComponentMetadata/${rootB}`).reply(200, { name: 'Root B', version: 1, type: 'PROCESS' })
+            .post(`${baseApiUrl}/ComponentReference/query`).reply(200, { numberOfResults: 1, result: [{ references: [{ componentId: sharedChild }] }] })
+            // Discovery for Shared Child (will be called for A, then skipped for B due to caching in the service)
+            .get(`${baseApiUrl}/ComponentMetadata/${sharedChild}`).reply(200, { name: 'Shared', version: 1, type: 'SUBPROCESS' })
+            .post(`${baseApiUrl}/ComponentReference/query`).reply(200, { numberOfResults: 0 });
+            
+        // --- Act & Assert ---
+        const initialResponse = await request(app).post('/api/v1/test-plans').send(requestBody).expect(202);
+        const planId = initialResponse.body.data.id;
+        await new Promise(resolve => setTimeout(resolve, 500));
         
-        expect(rootDetails.availableTests).toEqual([]); // The root component has no mapped test
-        expect(childDetails.availableTests).toEqual(['test-for-child-e2e']); // The child component has a mapped test
-        
-        expect(boomiScope.isDone()).toBe(true); // Verify all nock mocks were called
+        // Assert that the final plan in the database only contains 3 unique components
+        const componentsResult = await testPool.query('SELECT component_id FROM plan_components WHERE test_plan_id = $1', [planId]);
+        expect(componentsResult.rowCount).toBe(3);
+
+        const detailsResponse = await request(app).get(`/api/v1/test-plans/${planId}`).expect(200);
+        expect(detailsResponse.body.data.planComponents).toHaveLength(3);
+        expect(boomiScope.isDone()).toBe(true);
     });
 });

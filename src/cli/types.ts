@@ -17,8 +17,8 @@ export interface CliTestExecutionResult {
   log?: string;
 }
 
-// Represents a discovered component, enriched with its available tests and results
-export interface CliDiscoveredComponent {
+// Represents a component associated with a plan, enriched with its tests and results
+export interface CliPlanComponent {
   id: string;
   testPlanId: string;
   componentId: string;
@@ -31,16 +31,15 @@ export interface CliDiscoveredComponent {
 // Represents the entire Test Plan object returned by the API
 export interface CliTestPlan {
   id: string;
-  rootComponentId: string;
   status: CliTestPlanStatus;
   failureReason?: string;
   createdAt: string; // ISO date string
   updatedAt: string; // ISO date string
-  discoveredComponents: CliDiscoveredComponent[];
+  planComponents: CliPlanComponent[];
 }
 
 // Represents a summary of a Test Plan for the list view
-export type CliTestPlanSummary = Omit<CliTestPlan, 'discoveredComponents'>;
+export type CliTestPlanSummary = Omit<CliTestPlan, 'planComponents'>;
 
 // Represents a single mapping record for the new mappings commands
 export interface CliMapping {
@@ -71,8 +70,7 @@ export interface CliCredentialProfile {
 export interface CliEnrichedTestExecutionResult {
   id: string;
   testPlanId: string;
-  rootComponentId: string;
-  discoveredComponentId: string;
+  planComponentId: string;
   componentName?: string;
   testComponentId: string;
   testComponentName?: string;

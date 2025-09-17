@@ -51,14 +51,20 @@ export async function deleteCredentialProfile(profileName: string): Promise<void
 
 /**
  * Initiates the discovery process using a credential profile name.
- * @param rootComponentId The component to start discovery from.
+ * @param componentIds An array of component IDs to include in the plan.
  * @param credentialProfile The name of the credential profile to use.
+ * @param discoverDependencies If true, find all dependencies for the given component IDs.
  * @returns The newly created planId.
  */
-export async function initiateDiscovery(rootComponentId: string, credentialProfile: string): Promise<{ planId: string }> {
-  const response = await apiClient.post('/test-plans', { rootComponentId, credentialProfile });
+export async function initiateDiscovery(componentIds: string[], credentialProfile: string, discoverDependencies: boolean): Promise<{ planId: string }> {
+  const response = await apiClient.post('/test-plans', {
+    componentIds,
+    credentialProfile,
+    discoverDependencies,
+  });
   return { planId: response.data.data.id };
 }
+
 
 /**
  * Retrieves a summary list of all test plans.
