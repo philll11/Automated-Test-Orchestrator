@@ -37,10 +37,10 @@ export interface ITestPlanService {
   initiateDiscovery(componentIds: string[], credentialProfile: string, discoverDependencies: boolean): Promise<TestPlan>;
 
   /**
-   * Executes a selected list of tests for a given test plan.
+   * Executes a list of tests for a given plan. If testsToRun is omitted, all tests will be run.
    * @param planId The ID of the test plan.
-   * @param testsToRun An array of test component IDs to execute.
+   * @param testsToRun An optional array of test component IDs to execute.
    * @param credentialProfile The name of the credential profile to use for authentication and execution.
    */
-  executeTests(planId: string, testsToRun: string[], credentialProfile: string): Promise<void>;
+  executeTests(planId: string, testsToRun: string[] | undefined, credentialProfile: string): Promise<void>;
 }

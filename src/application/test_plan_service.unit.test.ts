@@ -192,7 +192,7 @@ describe('TestPlanService', () => {
             ]));
 
             await (service as any).processPlanComponents(['comp-A'], planId, credentialProfile, true);
-            
+
             expect(recursiveSpy).toHaveBeenCalledWith('comp-A', mockIntegrationService);
             expect(mockIntegrationService.getComponentInfo).not.toHaveBeenCalled();
             expect(mockPlanComponentRepo.saveAll).toHaveBeenCalledWith(expect.arrayContaining([
@@ -212,26 +212,93 @@ describe('TestPlanService', () => {
             { id: 'pc-2', testPlanId: planId, componentId: 'comp-B' },
         ];
 
-        it('should execute tests and save each result correctly', async () => {
-            const testsToRun = ['test-A'];
+        // This helper sets up the common mocks needed for both execute tests
+        const setupCommonMocks = () => {
             const planComponents = createPlanComponents();
             mockTestPlanRepo.findById.mockResolvedValue(createReadyTestPlan());
             mockPlanComponentRepo.findByTestPlanId.mockResolvedValue(planComponents);
-            mockMappingRepo.findAllTestsForMainComponents.mockResolvedValue(new Map([['comp-A', ['test-A']]]));
-
+            // Setup a map of all available tests for the plan
+            mockMappingRepo.findAllTestsForMainComponents.mockResolvedValue(new Map([
+                ['comp-A', ['test-A1', 'test-A2']],
+                ['comp-B', ['test-B1']],
+            ]));
             mockPlatformServiceFactory.create.mockResolvedValue(mockIntegrationService);
             mockIntegrationService.executeTestProcess.mockResolvedValue({ status: 'SUCCESS', message: 'Passed' });
+        };
 
+        it('should execute ONLY the specified tests when a list is provided', async () => {
+            // Arrange
+            setupCommonMocks();
+            const testsToRun = ['test-A1']; // User wants to run only one specific test
+
+            // Act
             await service.executeTests(planId, testsToRun, credentialProfile);
 
-            expect(mockTestExecutionResultRepo.save).toHaveBeenCalledWith({
-                testPlanId: planId,
-                planComponentId: planComponents[0].id,
-                testComponentId: 'test-A',
-                status: 'SUCCESS',
-                log: 'Passed'
-            } as NewTestExecutionResult);
+            // Assert
+            // Verify that executeTestProcess was called only for the specified test
+            expect(mockIntegrationService.executeTestProcess).toHaveBeenCalledTimes(1);
+            expect(mockIntegrationService.executeTestProcess).toHaveBeenCalledWith('test-A1');
+
+            // Verify that only one result was saved
+            expect(mockTestExecutionResultRepo.save).toHaveBeenCalledTimes(1);
+            expect(mockTestExecutionResultRepo.save).toHaveBeenCalledWith(expect.objectContaining({
+                testComponentId: 'test-A1'
+            }));
+
             expect(mockTestPlanRepo.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'COMPLETED' }));
+        });
+
+        it('should execute ALL available tests when the testsToRun parameter is undefined', async () => {
+            // Arrange
+            setupCommonMocks();
+            const testsToRun = undefined; // Simulate the user not providing the --tests flag
+
+            // Act
+            await service.executeTests(planId, testsToRun, credentialProfile);
+
+            // Assert
+            // Verify that executeTestProcess was called for ALL 3 available tests
+            expect(mockIntegrationService.executeTestProcess).toHaveBeenCalledTimes(3);
+            expect(mockIntegrationService.executeTestProcess).toHaveBeenCalledWith('test-A1');
+            expect(mockIntegrationService.executeTestProcess).toHaveBeenCalledWith('test-A2');
+            expect(mockIntegrationService.executeTestProcess).toHaveBeenCalledWith('test-B1');
+
+            // Verify that 3 results were saved
+            expect(mockTestExecutionResultRepo.save).toHaveBeenCalledTimes(3);
+
+            expect(mockTestPlanRepo.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'COMPLETED' }));
+        });
+
+        it('should execute ALL available tests when the testsToRun parameter is an empty array', async () => {
+            // Arrange
+            setupCommonMocks();
+            const testsToRun: string[] = []; // Another way the "run all" case can be triggered
+
+            // Act
+            await service.executeTests(planId, testsToRun, credentialProfile);
+
+            // Assert
+            // The result should be the same as the 'undefined' case
+            expect(mockIntegrationService.executeTestProcess).toHaveBeenCalledTimes(3);
+            expect(mockTestExecutionResultRepo.save).toHaveBeenCalledTimes(3);
+            expect(mockTestPlanRepo.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'COMPLETED' }));
+        });
+
+        it('should update plan to EXECUTION_FAILED on a system-level error', async () => {
+            // Arrange
+            const systemError = new Error("Database is down");
+            mockTestPlanRepo.findById.mockResolvedValue(createReadyTestPlan());
+            mockPlatformServiceFactory.create.mockRejectedValue(systemError);
+
+            // Act
+            await service.executeTests(planId, ['test-A'], credentialProfile);
+
+            // Assert
+            expect(mockTestExecutionResultRepo.save).not.toHaveBeenCalled();
+            expect(mockTestPlanRepo.update).toHaveBeenCalledWith(expect.objectContaining({
+                status: 'EXECUTION_FAILED',
+                failureReason: systemError.message,
+            }));
         });
     });
 });

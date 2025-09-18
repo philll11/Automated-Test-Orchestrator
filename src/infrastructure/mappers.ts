@@ -50,7 +50,7 @@ export function rowToMapping(row: any): Mapping {
     testComponentId: row.test_component_id,
     testComponentName: row.test_component_name,
     isDeployed: row.is_deployed,
-    isPackage: row.is_package,
+    isPackaged: row.is_package,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

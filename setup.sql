@@ -45,7 +45,7 @@ CREATE TABLE mappings (
     test_component_id VARCHAR(255) NOT NULL,
     test_component_name VARCHAR(255),
     is_deployed BOOLEAN DEFAULT FALSE,
-    is_package BOOLEAN DEFAULT FALSE,
+    is_packaged BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL
 );

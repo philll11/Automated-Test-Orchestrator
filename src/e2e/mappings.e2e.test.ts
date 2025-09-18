@@ -37,7 +37,7 @@ describe('Mappings API End-to-End Tests', () => {
                 testComponentId: 'e2e-test-1',
                 testComponentName: 'E2E Test',
                 isDeployed: true,
-                isPackage: false,
+                isPackaged: false,
             })
             .expect(201);
 

@@ -152,17 +152,17 @@ export class TestPlanController {
      * @swagger
      * /api/v1/test-plans/{planId}/execute:
      *   post:
-     *     summary: Execute Selected Tests
+     *     summary: Execute Tests for a Plan
      *     tags: [Test Plans]
-     *     description: Executes the user-selected test components found in a specific test plan using a credential profile.
+     *     description: >
+     *       Executes tests found in a specific test plan. 
+     *       If the 'testsToRun' array is provided, only those tests will be run.
+     *       If 'testsToRun' is omitted, all available tests in the plan will be executed.
      *     parameters:
      *       - in: path
      *         name: planId
      *         required: true
-     *         schema:
-     *           type: string
-     *           format: uuid
-     *           example: "a1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6"
+     *         schema: { type: string, format: uuid }
      *     requestBody:
      *       required: true
      *       content:
@@ -170,13 +170,13 @@ export class TestPlanController {
      *           schema:
      *             type: object
      *             required:
-     *               - testsToRun
      *               - credentialProfile
      *             properties:
      *               testsToRun:
      *                 type: array
      *                 items:
      *                   type: string
+     *                 description: "Optional. An array of specific test component IDs to run."
      *                 example: ["TEST-xyz-789"]
      *               credentialProfile:
      *                 type: string
@@ -189,8 +189,12 @@ export class TestPlanController {
         const { planId } = req.params;
         const { testsToRun, credentialProfile } = req.body;
 
-        if (!testsToRun || !Array.isArray(testsToRun) || !credentialProfile) {
-            throw new BadRequestError('testsToRun (as an array) and credentialProfile must be provided.');
+        if (!credentialProfile) {
+            throw new BadRequestError('credentialProfile must be provided.');
+        }
+
+        if (testsToRun !== undefined && !Array.isArray(testsToRun)) {
+            throw new BadRequestError('If provided, testsToRun must be an array.');
         }
 
         this.testPlanService.executeTests(planId, testsToRun, credentialProfile).catch(err => {

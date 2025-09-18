@@ -1,10 +1,12 @@
 // src/cli/commands/mappings.ts
 
 import { Command } from 'commander';
-import chalk from 'chalk';
-import { createMapping, getAllMappings, deleteMapping } from '../api_client.js';
 import ora from 'ora';
-import { handleCliError } from '../error_handler.js';
+import chalk from 'chalk';
+import { promises as fs } from 'fs';
+import { createMapping, getAllMappings, deleteMapping } from '../api_client.js';
+import { parseMappingCsv } from '../csv_parser.js';
+import { handleCliError, formatError } from '../error_handler.js';
 
 export function registerMappingsCommand(program: Command) {
     const mappingsCommand = new Command('mappings')
@@ -50,6 +52,56 @@ export function registerMappingsCommand(program: Command) {
                 console.log(chalk.cyan(`Mapping ID: ${newMapping.id}`));
             } catch (error: any) {
                 spinner.fail(chalk.red('Failed to create mapping.'));
+                handleCliError(error);
+            }
+        });
+
+    mappingsCommand
+        .command('import')
+        .description('Bulk import mappings from a CSV file')
+        .requiredOption('--from-csv <path>', 'Path to a CSV file with `mainComponentId` and `testComponentId` columns')
+        .action(async (options) => {
+            const spinner = ora('Preparing to import mappings...').start();
+            try {
+                spinner.text = `Reading and parsing CSV file from ${chalk.cyan(options.fromCsv)}...`;
+                const fileContent = await fs.readFile(options.fromCsv, 'utf-8');
+                const mappingsToCreate = parseMappingCsv(fileContent);
+
+                if (mappingsToCreate.length === 0) {
+                    spinner.warn('No valid mappings found in the CSV file.');
+                    return;
+                }
+                spinner.text = `Found ${chalk.bold(mappingsToCreate.length)} mappings to import.`;
+
+                let successCount = 0;
+                let failureCount = 0;
+
+                for (let i = 0; i < mappingsToCreate.length; i++) {
+                    const mapping = mappingsToCreate[i];
+                    spinner.text = `Importing mapping ${i + 1} of ${mappingsToCreate.length}: ${mapping.mainComponentId} -> ${mapping.testComponentId}`;
+                    try {
+                        await createMapping(mapping);
+                        successCount++;
+                    } catch (error: any) {
+                        failureCount++;
+                        const errorMessage = formatError(error); 
+                        spinner.stop();
+                        console.error(chalk.red(`\n  Failed to import row ${i + 2}: ${errorMessage}`));
+                        spinner.start();
+                    }
+                }
+
+                spinner.stop();
+                console.log(chalk.green('\n--- Import Complete ---'));
+                if (successCount > 0) {
+                    console.log(chalk.green(`Successfully imported ${successCount} mapping(s).`));
+                }
+                if (failureCount > 0) {
+                    console.log(chalk.red(`Failed to import ${failureCount} mapping(s). See error details above.`));
+                }
+
+            } catch (error: any) {
+                spinner.fail(chalk.red('A critical error occurred during the import process.'));
                 handleCliError(error);
             }
         });

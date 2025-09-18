@@ -141,7 +141,7 @@ export class TestPlanService implements ITestPlanService {
         return { ...testPlan, planComponents: planComponentsDetails };
     }
 
-    public async executeTests(planId: string, testsToRun: string[], credentialProfile: string): Promise<void> {
+    public async executeTests(planId: string, testsToRun: string[] | undefined, credentialProfile: string): Promise<void> {
         const testPlan = await this.testPlanRepository.findById(planId);
         if (!testPlan) throw new Error(`TestPlan with id ${planId} not found.`);
         if (testPlan.status !== 'AWAITING_SELECTION') throw new Error(`TestPlan not in AWAITING_SELECTION state.`);
@@ -161,7 +161,15 @@ export class TestPlanService implements ITestPlanService {
                 }
             });
 
-            const executionPromises = testsToRun.map(async (testId) => {
+            // If no specific tests were requested, run all available tests.
+            let finalTestsToExecute: string[];
+            if (testsToRun && testsToRun.length > 0) {
+                finalTestsToExecute = testsToRun;
+            } else {
+                finalTestsToExecute = Array.from(allAvailableTestsMap.values()).flat();
+            }
+
+            const executionPromises = finalTestsToExecute.map(async (testId) => {
                 const planComponent = testToPlanComponentMap.get(testId);
                 if (!planComponent) {
                     console.warn(`Test ID '${testId}' was requested but no corresponding component was found in this plan. Skipping.`);

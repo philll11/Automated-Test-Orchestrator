@@ -40,7 +40,7 @@ export class MappingsController {
      *               isDeployed:
      *                 type: boolean
      *                 example: true
-     *               isPackage:
+     *               isPackaged:
      *                 type: boolean
      *                 example: false
      *     responses:
@@ -48,11 +48,11 @@ export class MappingsController {
      *         description: Mapping created successfully.
      */
     async createMapping(req: Request, res: Response): Promise<void> {
-        const { mainComponentId, testComponentId, testComponentName, isDeployed, isPackage } = req.body;
+        const { mainComponentId, testComponentId, testComponentName, isDeployed, isPackaged } = req.body;
         if (!mainComponentId || !testComponentId) {
             throw new BadRequestError('mainComponentId and testComponentId are required');
         }
-        const newMapping = await this.mappingService.createMapping({ mainComponentId, testComponentId, testComponentName, isDeployed, isPackage });
+        const newMapping = await this.mappingService.createMapping({ mainComponentId, testComponentId, testComponentName, isDeployed, isPackaged });
         res.status(201).json({ metadata: { code: 201, message: 'Created' }, data: newMapping });
     }
 
@@ -154,7 +154,7 @@ export class MappingsController {
      *               isDeployed:
      *                 type: boolean
      *                 example: false
-     *               isPackage:
+     *               isPackaged:
      *                 type: boolean
      *                 example: true
      *     responses:
@@ -165,14 +165,14 @@ export class MappingsController {
      */
     async updateMapping(req: Request, res: Response): Promise<void> {
         const { mappingId } = req.params;
-        const { testComponentId, testComponentName, isDeployed, isPackage } = req.body;
+        const { testComponentId, testComponentName, isDeployed, isPackaged } = req.body;
         
         // Build the update object with only the fields that were provided
         const updateData: UpdateMappingData = {};
         if (testComponentId !== undefined) updateData.testComponentId = testComponentId;
         if (testComponentName !== undefined) updateData.testComponentName = testComponentName;
         if (isDeployed !== undefined) updateData.isDeployed = isDeployed;
-        if (isPackage !== undefined) updateData.isPackage = isPackage;
+        if (isPackaged !== undefined) updateData.isPackaged = isPackaged;
         
         if (Object.keys(updateData).length === 0) {
             throw new BadRequestError('At least one field to update must be provided');

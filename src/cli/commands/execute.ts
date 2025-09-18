@@ -11,19 +11,27 @@ export function registerExecuteCommand(program: Command) {
     .command('execute')
     .description('Execute a selected set of tests from a Test Plan.')
     .requiredOption('-p, --planId <id>', 'The Test Plan ID from the discovery phase')
-    .requiredOption('-t, --tests <ids>', 'A comma-separated list of test component IDs to run')
+    .option('-t, --tests <ids>', 'A comma-separated list of specific test component IDs to run. Leave empty to run all tests in the plan.')
     .requiredOption('--creds <profile>', 'The name of the credential profile to use')
     .action(async (options) => {
       const { planId, tests, creds: profileName } = options;
-      const testsToRun = tests.split(',').map((id: string) => id.trim()).filter(Boolean);
-      if (testsToRun.length === 0) {
-        console.error(chalk.red('Error: You must provide at least one test component ID.'));
-        process.exit(1);
+
+      let testsToRun: string[] | undefined = undefined;
+      if (tests) {
+        testsToRun = tests.split(',').map((id: string) => id.trim()).filter(Boolean);
+        if (testsToRun && testsToRun.length === 0) {
+          console.error(chalk.red('Error: If using the --tests flag, you must provide at least one test component ID.'));
+          process.exit(1);
+        }
       }
 
       const spinner = ora('Preparing execution...').start();
       try {
-        spinner.text = `Initiating execution for Plan ID: ${chalk.cyan(planId)}...`;
+
+        const executionMessage = testsToRun ? `selected tests for Plan ID: ${chalk.cyan(planId)}...` : `all available tests for Plan ID: ${chalk.cyan(planId)}...`;
+        spinner.text = `Initiating execution for ${executionMessage}`;
+
+        // Pass the potentially undefined 'testsToRun' array to the API client
         await initiateExecution(planId, testsToRun, profileName);
         spinner.text = 'Execution in progress. Waiting for results...';
 

@@ -12,12 +12,12 @@ export class MappingRepository implements IMappingRepository {
     constructor(@inject(TYPES.PostgresPool) private pool: Pool) {}
 
     async create(mapping: Omit<Mapping, 'createdAt' | 'updatedAt'>): Promise<Mapping> {
-        const { id, mainComponentId, testComponentId, testComponentName, isDeployed, isPackage } = mapping;
+        const { id, mainComponentId, testComponentId, testComponentName, isDeployed, isPackaged } = mapping;
         const now = new Date();
         const query = `
-            INSERT INTO mappings (id, main_component_id, test_component_id, test_component_name, is_deployed, is_package, created_at, updated_at)
+            INSERT INTO mappings (id, main_component_id, test_component_id, test_component_name, is_deployed, is_packaged, created_at, updated_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *;`;
-        const values = [id, mainComponentId, testComponentId, testComponentName, isDeployed, isPackage, now, now];
+        const values = [id, mainComponentId, testComponentId, testComponentName, isDeployed, isPackaged, now, now];
         const result = await this.pool.query(query, values);
         return rowToMapping(result.rows[0]);
     }
@@ -60,11 +60,11 @@ export class MappingRepository implements IMappingRepository {
         
         const query = `
             UPDATE mappings
-            SET test_component_id = $1, test_component_name = $2, is_deployed = $3, is_package = $4, updated_at = $5
+            SET test_component_id = $1, test_component_name = $2, is_deployed = $3, is_packaged = $4, updated_at = $5
             WHERE id = $6
             RETURNING *;
         `;
-        const values = [newValues.testComponentId, newValues.testComponentName, newValues.isDeployed, newValues.isPackage, newValues.updatedAt, id];
+        const values = [newValues.testComponentId, newValues.testComponentName, newValues.isDeployed, newValues.isPackaged, newValues.updatedAt, id];
 
         const result = await this.pool.query(query, values);
         return rowToMapping(result.rows[0]);

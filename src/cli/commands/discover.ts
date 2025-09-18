@@ -4,6 +4,7 @@ import type { Command } from 'commander';
 import ora from 'ora';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
+import { parseComponentIdCsv } from '../csv_parser.js';
 import { promises as fs } from 'fs';
 import { initiateDiscovery, pollForPlanCompletion, PlanFailedError } from '../api_client.js';
 import type { CliPlanComponent } from '../types.js';
@@ -26,9 +27,10 @@ export function registerDiscoverCommand(program: Command) {
           spinner.text = `Reading components from ${chalk.cyan(fromCsv)}...`;
           try {
             const fileContent = await fs.readFile(fromCsv, 'utf-8');
-            componentIds = fileContent.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+            componentIds = parseComponentIdCsv(fileContent);
           } catch (err) {
-            throw new Error(`Failed to read or parse the CSV file at ${fromCsv}`);
+            const message = err instanceof Error ? err.message : String(err);
+            throw new Error(`Failed to read or parse the CSV file at ${fromCsv}: ${message}`);
           }
         } else {
           spinner.stop(); // Stop spinner for interactive prompt

@@ -6,7 +6,7 @@ export interface Mapping {
   testComponentId: string;
   testComponentName?: string;
   isDeployed?: boolean;
-  isPackage?: boolean;
+  isPackaged?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

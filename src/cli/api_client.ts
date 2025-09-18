@@ -104,15 +104,15 @@ export async function pollForPlanCompletion(planId: string): Promise<CliTestPlan
 }
 
 /**
- * Initiates the execution of selected tests using a credential profile name.
+ * Initiates the execution of tests using a credential profile name.
  * @param planId The ID of the plan to execute.
- * @param testsToRun An array of test component IDs to execute.
+ * @param testsToRun An optional array of test component IDs. If omitted, all tests in the plan will be run.
  * @param credentialProfile The name of the credential profile to use.
  * @returns The initial response from the server.
  */
-export async function initiateExecution(planId: string, testsToRun: string[], credentialProfile: string): Promise<any> {
+export async function initiateExecution(planId: string, testsToRun: string[] | undefined, credentialProfile: string): Promise<any> {
   const response = await apiClient.post(`/test-plans/${planId}/execute`, {
-    testsToRun,
+    testsToRun, 
     credentialProfile,
   });
   return response.data;
@@ -140,11 +140,17 @@ export async function pollForExecutionCompletion(planId: string): Promise<CliTes
 // --- MAPPING FUNCTIONS ---
 
 /**
- * Creates a new test mapping between a main component and a test component.
- * @param data The mapping details including mainComponentId, testComponentId, and optional testComponentName.
+ * Creates a single new test mapping. This function is reused by the bulk import command.
+ * @param data The mapping details.
  * @returns The newly created mapping object.
  */
-export async function createMapping(data: { mainComponentId: string; testComponentId: string; testComponentName?: string }): Promise<CliMapping> {
+export async function createMapping(data: { 
+    mainComponentId: string; 
+    testComponentId: string; 
+    testComponentName?: string;
+    isDeployed?: boolean;
+    isPackage?: boolean;
+}): Promise<CliMapping> {
   const response = await apiClient.post('/mappings', data);
   return response.data.data;
 }
