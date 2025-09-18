@@ -1,47 +1,30 @@
+version: '3.8'
+
 services:
-  # Development
-  postgres-dev:
+  # The single PostgreSQL service for all environments
+  postgres:
     image: postgres:13
-    container_name: test-db-dev
+    container_name: ato-postgres
+    restart: always
     environment:
       POSTGRES_USER: devuser
       POSTGRES_PASSWORD: devpassword
-      POSTGRES_DB: devdb
-    ports:
-      - "5432:5432"
+      POSTGRES_DB: postgres # Connect to default db to run init script
     volumes:
-      - postgres_data_dev:/var/lib/postgresql/data
-      - ./setup.sql:/docker-entrypoint-initdb.d/setup.sql
+      - postgres_data:/var/lib/postgresql/data
+      # This script runs on startup to create our dev and test databases
+      - ./init-dbs.sh:/docker-entrypoint-initdb.d/init-dbs.sh
+      - ./packages/api-service/setup.sql:/docker-entrypoint-initdb.d/setup.sql
 
-  # Testing
-  postgres-test:
-    image: postgres:13
-    container_name: test-db-test
-    environment:
-      POSTGRES_USER: testuser
-      POSTGRES_PASSWORD: testpassword
-      POSTGRES_DB: testdb
-    ports:
-      - "5433:5432"
-    volumes:
-      - postgres_data_test:/var/lib/postgresql/data
-      - ./setup.sql:/docker-entrypoint-initdb.d/setup.sql
-
+  # The application service
   app:
-    build: .
-    container_name: dev-app
-    ports:
-      - "3000:3000"
+    build:
+      context: .
+      dockerfile: ./packages/api-service/Dockerfile
+    container_name: ato-app
+    restart: always
     depends_on:
-      - postgres-dev
-    environment:
-      NODE_ENV: development
-      DB_HOST: postgres-dev
-      DB_USER: devuser
-      DB_PASSWORD: devpassword
-      DB_NAME: devdb
-      DB_PORT: 5432
+      - postgres
 
 volumes:
-  postgres_data_dev:
-  postgres_data_test:
+  postgres_data:
