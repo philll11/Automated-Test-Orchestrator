@@ -1,6 +1,6 @@
 // src/app.ts
 
-import express from 'express';
+import express, { Request, Response } from 'express';
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './swagger.js';
 import testPlanRoutes from './routes/test_plans.js';
@@ -13,6 +13,11 @@ import { errorHandler } from './middleware/error_handler.js';
 const app = express();
 
 app.use(express.json());
+
+// Root endpoint
+app.get('/', (req: Request, res: Response) => {
+  res.status(200).send('Automated Test Orchestrator API is running! Visit /api-docs for API documentation.');
+});
 
 // Swagger UI
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
