@@ -7,6 +7,58 @@ import { TYPES } from '../inversify.types.js';
 import { BadRequestError, NotFoundError } from '../utils/app_error.js';
 import { UpdateMappingData } from '../ports/i_mapping_repository.js';
 
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     Mapping:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           format: uuid
+ *           description: The unique identifier for the mapping.
+ *         mainComponentId:
+ *           type: string
+ *           description: The ID of the main component being tested.
+ *         testComponentId:
+ *           type: string
+ *           description: The ID of the component that acts as a test.
+ *         testComponentName:
+ *           type: string
+ *           nullable: true
+ *           description: The human-readable name of the test component.
+ *         isDeployed:
+ *           type: boolean
+ *           nullable: true
+ *           description: Flag indicating if the test component is deployed.
+ *         isPackaged:
+ *           type: boolean
+ *           nullable: true
+ *           description: Flag indicating if the test component is a packaged component.
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *     ApiResponse_Mapping:
+ *       type: object
+ *       properties:
+ *         metadata:
+ *           $ref: '#/components/schemas/ResponseMetadata'
+ *         data:
+ *           $ref: '#/components/schemas/Mapping'
+ *     ApiResponse_MappingList:
+ *       type: object
+ *       properties:
+ *         metadata:
+ *           $ref: '#/components/schemas/ResponseMetadata'
+ *         data:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/Mapping'
+ */
 @injectable()
 export class MappingsController {
     constructor(
@@ -15,7 +67,7 @@ export class MappingsController {
 
     /**
      * @swagger
-     * /api/v1/mappings:
+     * /mappings:
      *   post:
      *     summary: Create a new test mapping
      *     tags: [Mappings]
@@ -46,6 +98,10 @@ export class MappingsController {
      *     responses:
      *       '201':
      *         description: Mapping created successfully.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ApiResponse_Mapping'
      */
     async createMapping(req: Request, res: Response): Promise<void> {
         const { mainComponentId, testComponentId, testComponentName, isDeployed, isPackaged } = req.body;
@@ -58,7 +114,7 @@ export class MappingsController {
 
     /**
      * @swagger
-     * /api/v1/mappings:
+     * /mappings:
      *   get:
      *     summary: Retrieve all test mappings
      *     tags: [Mappings]
@@ -66,6 +122,10 @@ export class MappingsController {
      *     responses:
      *       '200':
      *         description: A list of mappings.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ApiResponse_MappingList'
      */
     async getAllMappings(req: Request, res: Response): Promise<void> {
         const mappings = await this.mappingService.getAllMappings();
@@ -74,7 +134,7 @@ export class MappingsController {
 
     /**
      * @swagger
-     * /api/v1/mappings/{mappingId}:
+     * /mappings/{mappingId}:
      *   get:
      *     summary: Retrieve a single mapping by its ID
      *     tags: [Mappings]
@@ -89,6 +149,10 @@ export class MappingsController {
      *     responses:
      *       '200':
      *         description: The requested mapping.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ApiResponse_Mapping'
      *       '404':
      *         description: Mapping not found.
      */
@@ -101,7 +165,7 @@ export class MappingsController {
 
     /**
      * @swagger
-     * /api/v1/mappings/component/{mainComponentId}:
+     * /mappings/component/{mainComponentId}:
      *   get:
      *     summary: Retrieve all mappings for a component
      *     tags: [Mappings]
@@ -116,6 +180,10 @@ export class MappingsController {
      *     responses:
      *       '200':
      *         description: A list of mappings for the component.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ApiResponse_MappingList'
      */
     async getMappingsByMainComponentId(req: Request, res: Response): Promise<void> {
         const { mainComponentId } = req.params;
@@ -125,11 +193,11 @@ export class MappingsController {
 
     /**
      * @swagger
-     * /api/v1/mappings/{mappingId}:
+     * /mappings/{mappingId}:
      *   put:
      *     summary: Update a test mapping
      *     tags: [Mappings]
-     *     description: Updates the `testComponentId` for an existing mapping.
+     *     description: Updates one or more fields for an existing mapping.
      *     parameters:
      *       - in: path
      *         name: mappingId
@@ -143,7 +211,6 @@ export class MappingsController {
      *         application/json:
      *           schema:
      *             type: object
-     *             required: [testComponentId]
      *             properties:
      *               testComponentId:
      *                 type: string
@@ -160,6 +227,10 @@ export class MappingsController {
      *     responses:
      *       '200':
      *         description: The updated mapping.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/ApiResponse_Mapping'
      *       '404':
      *         description: Mapping not found.
      */
@@ -185,7 +256,7 @@ export class MappingsController {
 
     /**
      * @swagger
-     * /api/v1/mappings/{mappingId}:
+     * /mappings/{mappingId}:
      *   delete:
      *     summary: Delete a test mapping
      *     tags: [Mappings]

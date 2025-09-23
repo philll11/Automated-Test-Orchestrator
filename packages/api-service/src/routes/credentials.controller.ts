@@ -6,6 +6,48 @@ import { TYPES } from '../inversify.types.js';
 import { ICredentialService } from '../ports/i_credential_service.js';
 import { BadRequestError, NotFoundError } from '../utils/app_error.js';
 
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     ResponseMetadata:
+ *       type: object
+ *       properties:
+ *         code:
+ *           type: integer
+ *           example: 200
+ *         message:
+ *           type: string
+ *           example: "OK"
+ *     CredentialProfile:
+ *       type: object
+ *       description: "Represents a saved credential profile, omitting sensitive fields."
+ *       properties:
+ *         profileName:
+ *           type: string
+ *           example: "dev-account"
+ *         credentials:
+ *           type: object
+ *           properties:
+ *             accountId:
+ *               type: string
+ *               example: "boomi-V123XYZ"
+ *             username:
+ *               type: string
+ *               example: "user@example.com"
+ *             executionInstanceId:
+ *               type: string
+ *               example: "atom-1a2b3c"
+ *     ApiResponse_CredentialProfileList:
+ *       type: object
+ *       properties:
+ *         metadata:
+ *           $ref: '#/components/schemas/ResponseMetadata'
+ *         data:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/CredentialProfile'
+ */
 @injectable()
 export class CredentialsController {
   constructor(
@@ -14,7 +56,7 @@ export class CredentialsController {
 
   /**
    * @swagger
-   * /api/v1/credentials:
+   * /credentials:
    *   post:
    *     summary: Add or Update a Credential Profile
    *     tags: [Credentials]
@@ -69,25 +111,18 @@ export class CredentialsController {
 
   /**
    * @swagger
-   * /api/v1/credentials:
+   * /credentials:
    *   get:
    *     summary: List Credential Profiles
    *     tags: [Credentials]
    *     description: Retrieves a list of all saved credential profiles, omitting sensitive fields.
    *     responses:
    *       '200':
-   *         description: OK.
+   *         description: OK. A list of saved credential profiles.
    *         content:
    *           application/json:
    *             schema:
-   *               type: object
-   *               properties:
-   *                 metadata:
-   *                   $ref: '#/components/schemas/ResponseMetadata'
-   *                 data:
-   *                   type: array
-   *                   items:
-   *                     $ref: '#/components/schemas/CredentialProfile'
+   *               $ref: '#/components/schemas/ApiResponse_CredentialProfileList'
    */
   public async listCredentials(req: Request, res: Response): Promise<void> {
     const profiles = await this.credentialService.list();
@@ -99,7 +134,7 @@ export class CredentialsController {
 
   /**
    * @swagger
-   * /api/v1/credentials/{profileName}:
+   * /credentials/{profileName}:
    *   delete:
    *     summary: Delete a Credential Profile
    *     tags: [Credentials]

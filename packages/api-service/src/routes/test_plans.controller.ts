@@ -6,6 +6,75 @@ import { TYPES } from '../inversify.types.js';
 import { ITestPlanService } from '../ports/i_test_plan_service.js';
 import { BadRequestError, NotFoundError } from '../utils/app_error.js';
 
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     TestPlan:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           format: uuid
+ *           description: The unique identifier for the test plan.
+ *         status:
+ *           type: string
+ *           enum: [DISCOVERING, AWAITING_SELECTION, EXECUTING, COMPLETED, DISCOVERY_FAILED, EXECUTION_FAILED]
+ *           description: The current lifecycle status of the test plan.
+ *         failureReason:
+ *           type: string
+ *           nullable: true
+ *           description: The reason for failure, if the status is DISCOVERY_FAILED or EXECUTION_FAILED.
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *     ApiResponse_TestPlan:
+ *       type: object
+ *       properties:
+ *         metadata:
+ *           $ref: '#/components/schemas/ResponseMetadata'
+ *         data:
+ *           $ref: '#/components/schemas/TestPlan'
+ *     ApiResponse_TestPlanList:
+ *       type: object
+ *       properties:
+ *         metadata:
+ *           $ref: '#/components/schemas/ResponseMetadata'
+ *         data:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/TestPlan'
+ *     TestPlanWithDetails:
+ *       allOf:
+ *         - $ref: '#/components/schemas/TestPlan'
+ *         - type: object
+ *           properties:
+ *             entryPoints:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   componentId:
+ *                     type: string
+ *             planComponents:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/PlanComponent' # Assuming PlanComponent schema will be defined elsewhere
+ *             executionResults:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/TestExecutionResult' # Assuming TestExecutionResult schema will be defined elsewhere
+ *     ApiResponse_TestPlanWithDetails:
+ *       type: object
+ *       properties:
+ *         metadata:
+ *           $ref: '#/components/schemas/ResponseMetadata'
+ *         data:
+ *           $ref: '#/components/schemas/TestPlanWithDetails'
+ */
 @injectable()
 export class TestPlanController {
     constructor(
@@ -14,7 +83,7 @@ export class TestPlanController {
 
     /**
      * @swagger
-     * /api/v1/test-plans:
+     * /test-plans:
      *   get:
      *     summary: Get All Test Plans
      *     tags: [Test Plans]
@@ -25,21 +94,7 @@ export class TestPlanController {
      *         content:
      *           application/json:
      *             schema:
-     *               type: object
-     *               properties:
-     *                 metadata:
-     *                   type: object
-     *                   properties:
-     *                     code:
-     *                       type: integer
-     *                       example: 200
-     *                     message:
-     *                       type: string
-     *                       example: OK
-     *                 data:
-     *                   type: array
-     *                   items:
-     *                     $ref: '#/components/schemas/TestPlan'
+     *               $ref: '#/components/schemas/ApiResponse_TestPlanList'
      */
     public async getAllPlans(req: Request, res: Response): Promise<void> {
         const testPlans = await this.testPlanService.getAllPlans();
@@ -51,7 +106,7 @@ export class TestPlanController {
 
     /**
      * @swagger
-     * /api/v1/test-plans:
+     * /test-plans:
      *   post:
      *     summary: Create a new Test Plan
      *     tags: [Test Plans]
@@ -111,11 +166,11 @@ export class TestPlanController {
 
     /**
      * @swagger
-     * /api/v1/test-plans/{planId}:
+     * /test-plans/{planId}:
      *   get:
      *     summary: Get Test Plan Status & Results
      *     tags: [Test Plans]
-     *     description: Retrieves the status and results of a test plan, including all discovered components.
+     *     description: Retrieves the status and results of a test plan, including all discovered components and their individual test results.
      *     parameters:
      *       - in: path
      *         name: planId
@@ -130,7 +185,7 @@ export class TestPlanController {
      *         content:
      *           application/json:
      *             schema:
-     *               $ref: '#/components/schemas/ApiResponse_TestPlanWithComponents'
+     *               $ref: '#/components/schemas/ApiResponse_TestPlanWithDetails'
      *       '404':
      *         description: Test plan not found.
      */
@@ -150,7 +205,7 @@ export class TestPlanController {
 
     /**
      * @swagger
-     * /api/v1/test-plans/{planId}/execute:
+     * /test-plans/{planId}/execute:
      *   post:
      *     summary: Execute Tests for a Plan
      *     tags: [Test Plans]

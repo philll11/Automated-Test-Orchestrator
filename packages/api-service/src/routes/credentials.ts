@@ -16,7 +16,6 @@ const router = Router();
 // Resolve the controller from the DI container
 const credentialsController = container.get<CredentialsController>(TYPES.CredentialsController);
 
-// Define the routes and bind them to the controller methods, preserving the 'this' context.
 router.post('/', asyncHandler(credentialsController.addCredential.bind(credentialsController)));
 router.get('/', asyncHandler(credentialsController.listCredentials.bind(credentialsController)));
 router.delete('/:profileName', asyncHandler(credentialsController.deleteCredential.bind(credentialsController)));

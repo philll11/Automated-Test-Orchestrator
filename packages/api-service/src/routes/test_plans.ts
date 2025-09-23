@@ -16,8 +16,6 @@ const router = Router();
 // Resolve the controller from the DI container
 const testPlanController = container.get<TestPlanController>(TYPES.TestPlanController);
 
-// Define the routes and bind them to the controller methods
-// .bind() is crucial to ensure 'this' is correctly set inside the controller methods
 router.get('/', asyncHandler(testPlanController.getAllPlans.bind(testPlanController))); 
 router.post('/', asyncHandler(testPlanController.initiateDiscovery.bind(testPlanController)));
 router.get('/:planId', asyncHandler(testPlanController.getPlanAndComponents.bind(testPlanController)));
