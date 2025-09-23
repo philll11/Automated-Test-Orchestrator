@@ -82,21 +82,18 @@ function _promptForCredentials(): Promise<{ [key: string]: any }> {
 }
 
 export const credsCommand = new Command('creds')
-    .description('Manage secure credential profiles')
-    .addCommand(
-        new Command('add')
-            .description('Add a new credential profile')
-            .argument('<profile>', 'The name of the profile to add (e.g., "dev-account")')
-            .action(addCredentialCommand)
-    )
-    .addCommand(
-        new Command('list')
-            .description('List all saved credential profiles')
-            .action(listCredentialsCommand)
-    )
-    .addCommand(
-        new Command('delete')
-            .description('Delete a credential profile')
-            .argument('<profile>', 'The name of the profile to delete')
-            .action(deleteCredentialCommand)
-    );
+    .description('Manage secure credential profiles');
+
+credsCommand.command('add')
+    .description('Add a new credential profile')
+    .argument('<profile>', 'The name of the profile to add (e.g., "dev-account")')
+    .action(addCredentialCommand);
+
+credsCommand.command('list')
+    .description('List all saved credential profiles')
+    .action(listCredentialsCommand);
+
+credsCommand.command('delete')
+    .description('Delete a credential profile')
+    .argument('<profile>', 'The name of the profile to delete')
+    .action(deleteCredentialCommand);

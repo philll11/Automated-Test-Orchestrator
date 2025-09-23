@@ -23,3 +23,6 @@ yarn-error.log*
 # OS specific
 .DS_Store
 Thumbs.db
+
+# Package Lock files
+package-lock.json
