@@ -30,7 +30,7 @@ RUN npm run build -w api-service
 FROM node:24-alpine
 
 # Set the NODE_ENV to production
-ENV NODE_ENV production
+ENV NODE_ENV=production
 
 WORKDIR /usr/src/app
 
