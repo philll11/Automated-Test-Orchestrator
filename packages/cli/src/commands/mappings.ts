@@ -110,7 +110,7 @@ export function registerMappingsCommand(program: Command) {
         .command('rm')
         .description('Remove a test mapping by its unique ID')
         .argument('<mappingId>', 'The unique ID of the mapping to remove')
-        .action(async (mappingId) => {
+        .action(async (mappingId: string) => {
             const spinner = ora(`Removing mapping ${mappingId}...`).start();
             try {
                 await deleteMapping(mappingId);
