@@ -8,10 +8,16 @@ const options: swaggerJsdoc.Options = {
     info: {
       title: 'Automated Test Orchestrator API',
       version: '1.0.0',
-      description: 'API for the Automated Test Orchestrator',
+      description: 'API for the Automated Test Orchestrator. This documentation is auto-generated from the source code.',
     },
+    servers: [
+      {
+        url: "/api/v1",
+        description: "API v1"
+      }
+    ]
   },
-  apis: ['./src/routes/*.ts'], // Path to the API docs
+  apis: ['./dist/routes/*.controller.js'],
 };
 
 const swaggerSpec = swaggerJsdoc(options);
