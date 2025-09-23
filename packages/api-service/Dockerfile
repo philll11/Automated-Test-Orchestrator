@@ -44,6 +44,9 @@ RUN npm install --omit=dev
 # Copy the compiled application code from the builder stage
 COPY --from=builder /usr/src/app/packages/api-service/dist ./dist
 
+# Copy any other necessary files (e.g., configuration files, certificates)
+COPY packages/api-service/certs/DigiCertGlobalRootG2.crt.pem ./certs/DigiCertGlobalRootG2.crt.pem
+
 # The port that your app will run on
 EXPOSE 3000
 

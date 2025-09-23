@@ -1,12 +1,29 @@
 // src/infrastructure/database.ts
 
 import pg from 'pg';
+import fs from 'fs';
+import path from 'path';
+
 const { Pool } = pg;
 
-// Configure SSL for production environment
-const sslConfig = process.env.NODE_ENV === 'production'
-  ? { ssl: { rejectUnauthorized: false } }
-  : undefined;
+
+let sslConfig;
+
+if (process.env.NODE_ENV === 'production') {
+  // In production (Azure), we MUST use SSL and provide the root certificate.
+  // The path is relative to the running app's root directory in the container.
+  const caPath = path.resolve(process.cwd(), './certs/DigiCertGlobalRootG2.crt.pem');
+  
+  sslConfig = {
+    ssl: {
+      rejectUnauthorized: true,
+      ca: fs.readFileSync(caPath).toString(),
+    },
+  };
+} else {
+  // For local development against Docker, SSL is not needed.
+  sslConfig = undefined;
+}
 
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
