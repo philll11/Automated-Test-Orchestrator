@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -ws",
+    "build": "npm run build",
     "test": "jest --verbose",
     "dev:api": "npm run dev -w api-service",
     "start:api": "npm start -w api-service"
