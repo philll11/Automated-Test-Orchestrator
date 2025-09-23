@@ -64,7 +64,7 @@ copy .env.example .env
 # For macOS/Linux
 cp .env.example .env
 ```
-Now, open the `.env` file and fill in the required values, such as credentials for your test integration platform.
+Now, open the `.env` file and fill in the required values - only the API_BASE_URL is required to run locally.
 
 ### 3. Install Dependencies
 Install all dependencies for both the `api-service` and the `cli` using a single command from the project root.
@@ -121,7 +121,18 @@ If you make changes to the `api-service` code, you will need to restart the Dock
 
 ## Running Tests
 
-All tests can be run from the project root directory.
+Testing uses environment variables for configuration. Create a `.env.test` file in the /package/api-service directory by copying the example file.
+
+```sh
+# For Windows (Command Prompt)
+copy .env.test.example .env.test
+
+# For macOS/Linux
+cp .env.test.example .env.test
+```
+Next, open the `.env.test` file and fill in the required values, such as credentials for your test integration platform and real component IDs you want to test.
+
+All tests can be run from the project root directory. 
 
 ```sh
 # Run all tests for all packages
