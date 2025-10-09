@@ -9,7 +9,9 @@
     "build": "npm run build -ws",
     "test": "jest --verbose",
     "dev:api": "npm run dev -w api-service",
-    "start:api": "npm start -w api-service"
+    "start:api": "npm start -w api-service",
+    "use:dev": "copy .env.dev .env",
+    "use:local": "copy .env.local .env"
   },
   "devDependencies": {
     "@babel/core": "7.28.4",
@@ -19,6 +21,7 @@
     "@types/supertest": "6.0.3",
     "babel-jest": "29.7.0",
     "dotenv": "16.4.5",
+    "dotenv-cli": "10.0.0",
     "jest": "29.7.0",
     "nock": "14.0.10",
     "supertest": "7.1.4",
