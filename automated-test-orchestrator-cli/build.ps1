@@ -29,4 +29,4 @@ Write-Host "Compiling for Linux (amd64)..."
 $env:GOOS="linux"; $env:GOARCH="amd64"; go build -o "$OutputDir/ato-linux-amd64" .
 
 Write-Host ""
-Write-Host -ForegroundColor Green "✅ Build complete! All binaries are in the '$OutputDir' directory."
+Write-Host -ForegroundColor Green "Build complete! All binaries are in the '$OutputDir' directory."
