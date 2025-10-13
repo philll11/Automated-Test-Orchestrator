@@ -1,0 +1,21 @@
+# Git and OS files
+.git
+.gitignore
+*.md
+
+# Node modules - we install these inside the container
+node_modules
+packages/api-service/node_modules
+packages/cli/node_modules
+
+# Local environment files
+.env*
+!/.env.example
+
+# Build output - this is generated inside the container
+dist
+packages/api-service/dist
+packages/cli/dist
+
+# Logs and temporary files
+npm-debug.log*

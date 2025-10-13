@@ -1,10 +1,9 @@
-# Automated Test Orchestrator (ATO)
+# **Automated Test Orchestrator (ATO)**
 
 The Automated Test Orchestrator is an application designed to improve the reliability and efficiency of integration development by automating the discovery and execution of tests for any given component and its entire dependency tree.
 
-## Table of Contents
+## **Table of Contents**
 
--   [Mission Statement](#mission-statement)
 -   [Core Features](#core-features)
 -   [Architecture Overview](#architecture-overview)
 -   [Prerequisites](#prerequisites)
@@ -12,13 +11,9 @@ The Automated Test Orchestrator is an application designed to improve the reliab
 -   [Development Workflow](#development-workflow)
 -   [Running Tests](#running-tests)
 -   [Project Structure](#project-structure)
--   [Deployment](#deployment)
+-   [Deployment & Distribution](#deployment--distribution)
 
-## Mission Statement
-
-To design and build an application that serves as both a test execution engine and a test coverage analysis tool, improving confidence and accelerating development cycles for integration platforms.
-
-## Core Features
+## **Core Features**
 
 -   **Flexible Test Plan Creation:** Create test plans from a list of components via CLI or CSV import.
 -   **Automated Dependency Discovery:** Recursively discover all nested child components to build a complete dependency map.
@@ -27,150 +22,168 @@ To design and build an application that serves as both a test execution engine a
 -   **Consolidated Reporting:** View clear, Jest-like summary reports for every test execution.
 -   **Historical Analysis:** Query and analyze historical test plans and their detailed results.
 
-## Architecture Overview
+## **Architecture Overview**
 
-This project is a **monorepo** managed with NPM Workspaces, containing two primary packages:
+This repository contains two distinct, independent applications that work together:
 
-1.  **`api-service`**: A backend Node.js/Express application built using **Hexagonal Architecture (Ports & Adapters)**. This service contains all core business logic and exposes a REST API.
-2.  **`ato-cli`**: A command-line interface that acts as a client to the `api-service`, providing a user-friendly way to create plans, execute tests, and manage credentials.
+1.  **`automated-test-orchestrator-api`**: The backend service, a Node.js/Express application built using **Hexagonal Architecture (Ports & Adapters)**. This service contains all core business logic and exposes a REST API. It is designed to be run as a containerized application via Docker.
 
-The entire stack is designed to be run locally via Docker and deployed to the cloud (Azure) as a containerized application.
+2.  **`automated-test-orchestrator-cli`**: The user-facing client, a command-line interface written in **Go (Golang)**. It is a standalone, cross-platform binary that interacts with the `api-service`. It is compiled locally and does not require Node.js to run.
 
-## Prerequisites
+## **Prerequisites**
 
 Before you begin, ensure you have the following installed on your machine:
--   **Node.js** (LTS version, e.g., v20.x or higher)
--   **NPM** (usually comes with Node.js)
--   **Docker** and **Docker Compose**
 -   **Git**
+-   **Docker** and **Docker Compose**
+-   **For the API Service:** Node.js (LTS version, e.g., v20.x or higher) & NPM
+-   **For the CLI:** Go (e.g., v1.21 or higher)
 
-## Getting Started
+## **Getting Started**
 
-Follow these steps to get the application running on your local machine.
+Follow these steps to get both the backend and the CLI running on your local machine.
 
-### 1. Clone the Repository
+### **1. Clone the Repository**
 ```sh
 git clone <your-repository-url>
 cd <repository-directory>
 ```
 
-### 2. Set Up Environment Variables
-The application uses environment variables for configuration. Create a `.env` file in the root of the project by copying the example file.
+### **2. Set Up & Start the Backend API**
+
+The API runs inside Docker containers.
 
 ```sh
-# For Windows (Command Prompt)
+# 1. Navigate into the API directory
+cd automated-test-orchestrator-api
+
+# 2. Set up environment variables by copying the example
+# For Windows (PowerShell)
 copy .env.example .env
 
 # For macOS/Linux
 cp .env.example .env
-```
-Now, open the `.env` file and fill in the required values - only the API_BASE_URL is required to run locally.
 
-### 3. Install Dependencies
-Install all dependencies for both the `api-service` and the `cli` using a single command from the project root.
-
-```sh
+# 3. Install Node.js dependencies
 npm install
-```
 
-### 4. Start the Backend Services
-Run the following command from the project root to build and start the `api-service` and PostgreSQL database containers.
-
-```sh
-# Run in the foreground to see logs
+# 4. Build and start the API service and PostgreSQL database containers
 docker-compose up --build
-
-# Or, run in the background (detached mode)
-docker-compose up --build -d
 ```
-The `api-service` will be available at `http://localhost:3000`.
+The `api-service` will now be running and available at `http://localhost:3000`. Keep this terminal open to see live logs.
 
-### 5. Build and Link the CLI
-To use the `ato` command in your terminal, you need to compile the CLI and link it locally.
+### **3. Set Up & Install the CLI**
+
+The Go CLI is compiled into a native executable and "installed" by placing it in a directory on your system's PATH.
 
 ```sh
-# 1. Build the CLI TypeScript code into JavaScript
-npm run build -w ato-cli
+# 1. In a NEW terminal, navigate into the CLI directory
+cd automated-test-orchestrator-cli
 
-# 2. Navigate into the CLI package directory
-cd packages/cli
+# 2. Build the executable. This creates an 'ato.exe' (Windows) or 'ato' (macOS/Linux) file.
+go build -o ato .
 
-# 3. Create a global 'ato' command linked to your local code
-npm link
+# 3. "Install" the CLI by moving the executable to a directory on your PATH.
+#    (See your OS documentation for how to add a directory to your PATH if needed)
+
+# For Windows (assuming C:\Users\YourUser\bin is in your PATH)
+move ato.exe C:\Users\YourUser\bin\
+
+# For macOS/Linux (assuming /usr/local/bin is in your PATH)
+sudo mv ato /usr/local/bin/
 ```
 
-### 6. Verify the Setup
-The setup is complete! You can now interact with the running `api-service` using the CLI.
+### **4. Configure and Verify the CLI**
+
+With the API running and the CLI installed, you can now configure and test the connection.
 
 ```sh
-# Navigate back to the project root
-cd ../..
+# 1. Tell the CLI where the API is running. This is saved for all future commands.
+ato config set api_url http://localhost:3000/api/v1
 
-# Test the CLI by listing credential profiles (will be empty)
+# 2. Verify the setup by listing credential profiles (this will be empty initially)
 ato creds list
 ```
+Your full development environment is now set up!
 
-## Development Workflow
+## **Development Workflow**
 
-The typical workflow involves two separate terminals:
+-   **API Development:** Make changes to the code in the `automated-test-orchestrator-api/src` directory. To see your changes, you must restart the Docker containers by stopping (`Ctrl+C`) and re-running `docker-compose up --build`.
+-   **CLI Development:** Make changes to the code in the `automated-test-orchestrator-cli` directory. You can either:
+    -   Run commands directly during development using `go run . <command>`.
+    -   Re-build and re-install the binary using the steps in "Getting Started" to test the final executable.
 
-1.  **Terminal 1 (Backend):** Keep the backend services running with `docker-compose up` to see live logs from the `api-service` and database.
-2.  **Terminal 2 (CLI):** Use this terminal to run `ato` commands to interact with your application.
+## **Running Tests**
 
-If you make changes to the `api-service` code, you will need to restart the Docker containers (`docker-compose up --build`). If you make changes to the `cli` code, you only need to rebuild it (`npm run build -w ato-cli`).
+Tests for each application must be run from within their respective directories.
 
-## Running Tests
+### **API Service Tests**
 
-Testing uses environment variables for configuration. Create a `.env.test` file in the /package/api-service directory by copying the example file.
+First, ensure your test database credentials are set up.
 
 ```sh
-# For Windows (Command Prompt)
+# In the automated-test-orchestrator-api directory
+# For Windows (PowerShell)
 copy .env.test.example .env.test
 
 # For macOS/Linux
 cp .env.test.example .env.test
 ```
-Next, open the `.env.test` file and fill in the required values, such as credentials for your test integration platform and real component IDs you want to test.
-
-All tests can be run from the project root directory. 
+Open `.env.test` and ensure the `DB_PASSWORD` and other variables match your main `.env` file.
 
 ```sh
-# Run all tests for all packages
-npm test
+# In the automated-test-orchestrator-api directory
 
-# Run only unit tests for the api-service
-npm run test:unit:all -w api-service
+# Run all unit tests
+npm run test:unit
 
-# Run only integration tests for the api-service
-npm run test:int:all -w api-service
+# Run all integration tests (requires Docker database to be running)
+# These run serially to prevent database race conditions
+npm run test:integration
 
-# Run only end-to-end tests for the api-service
-npm run test:e2e:all -w api-service
+# Run all end-to-end tests (requires Docker database to be running)
+npm run test:e2e
 ```
 
-## Project Structure
+### **CLI Tests**
+
+The Go project contains its own set of unit tests.
+
+```sh
+# In the automated-test-orchestrator-cli directory
+
+# Run all tests
+go test ./...
+```
+
+## **Project Structure**
 ```
 /
-├── .dockerignore
-├── .gitignore
-├── docker-compose.yml   # Main Docker orchestration
-├── docker-compose.override.yml # Local Docker configuration
-├── init-dbs.sh          # Database initialization script
-├── package.json         # Root package.json (manages the monorepo)
-└── packages/
-    ├── api-service/     # The deployable backend application
-    │   ├── Dockerfile
-    │   ├── package.json
-    │   ├── tsconfig.json
-    │   └── src/
-    └── cli/             # The standalone CLI tool
-        ├── package.json
-        ├── tsconfig.json
-        └── src/
+├── automated-test-orchestrator-api/   # The deployable backend application
+│   ├── .env.example
+│   ├── docker-compose.yml
+│   ├── Dockerfile
+│   ├── package.json
+│   └── src/
+└── automated-test-orchestrator-cli/   # The standalone Go CLI tool
+    ├── go.mod
+    ├── build.ps1        # Example build script for cross-compilation
+    ├── main.go
+    ├── cmd/
+    └── internal/
 ```
 
-## Deployment
+## **Deployment & Distribution**
 
-The `api-service` is designed for containerized deployment. The multi-stage `Dockerfile` located in `packages/api-service` creates a lightweight, production-optimized image containing only the necessary runtime code.
+### **API Service**
+The `api-service` is designed for containerized deployment. The multi-stage `Dockerfile` creates a lightweight, production-optimized image. This image can be pushed to a container registry (like Azure Container Registry) and deployed to a container hosting service like **Azure App Service**.
 
-This image can be pushed to a container registry (like Azure Container Registry) and deployed to a container hosting service like **Azure App Service**. The CLI package is **not** part of the deployment artifact.
+### **CLI**
+The CLI is distributed as a standalone binary. To create executables for multiple platforms (cross-compilation), use the provided `build.ps1` script or run the `go build` command with the appropriate `GOOS` and `GOARCH` environment variables.
+
+```sh
+# In the automated-test-orchestrator-cli directory
+
+# Example: Build for Windows, macOS (ARM), and Linux
+.\build.ps1
+```
+The resulting binaries in the `dist/` folder can be shared directly with end-users.

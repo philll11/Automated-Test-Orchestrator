@@ -1,0 +1,17 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "allowJs": true,
+        "types": [
+            "jest",
+            "node"
+        ]
+    },
+    "include": [
+        "src/**/*.ts"
+    ], // Explicitly include all source and test files
+    "exclude": [
+        "node_modules",
+        "dist"
+    ] // Only exclude node_modules and the output dir
+}

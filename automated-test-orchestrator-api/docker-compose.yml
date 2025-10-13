@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  # The single PostgreSQL service for all environments
+  postgres:
+    image: postgres:13
+    container_name: ato-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: devuser
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: postgres # Connect to default db to run init script
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # This script runs on startup to create our dev and test databases
+      - ./init-dbs.sh:/docker-entrypoint-initdb.d/init-dbs.sh
+      - ./setup.sql:/docker-entrypoint-initdb.d/setup.sql
+
+  # The application service
+  app:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    container_name: ato-app
+    restart: always
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
