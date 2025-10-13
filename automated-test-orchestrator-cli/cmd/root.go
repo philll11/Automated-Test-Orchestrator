@@ -28,6 +28,8 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
+	rootCmd.Version = "1.0.0"
+
 	// Define a persistent flag available to all subcommands.
 	rootCmd.PersistentFlags().String("api-url", "http://localhost:3000/api/v1", "The base URL for the Orchestrator API")
 
