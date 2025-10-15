@@ -8,7 +8,7 @@ type CliTestExecutionResult struct {
 	ID              string  `json:"id"`
 	TestComponentID string  `json:"testComponentId"`
 	Status          string  `json:"status"` // "SUCCESS" or "FAILURE"
-	Log             *string `json:"log,omitempty"`
+	Message         *string `json:"message,omitempty"`
 }
 
 // CliPlanComponent represents a component within a plan, enriched with its tests and results.
@@ -25,6 +25,7 @@ type CliPlanComponent struct {
 // CliTestPlan represents the entire Test Plan object returned by the API.
 type CliTestPlan struct {
 	ID             string             `json:"id"`
+	Name           string             `json:"name"`
 	Status         string             `json:"status"`
 	FailureReason  *string            `json:"failureReason,omitempty"`
 	CreatedAt      time.Time          `json:"createdAt"`
@@ -35,6 +36,7 @@ type CliTestPlan struct {
 // CliTestPlanSummary represents a summary of a Test Plan for the list view.
 type CliTestPlanSummary struct {
 	ID        string    `json:"id"`
+	Name      string    `json:"name"`
 	Status    string    `json:"status"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
@@ -42,6 +44,7 @@ type CliTestPlanSummary struct {
 
 // InitiateDiscoveryRequest is the structure for the POST /test-plans request body.
 type InitiateDiscoveryRequest struct {
+	Name                 string   `json:"name"`
 	ComponentIDs         []string `json:"componentIds"`
 	CredentialProfile    string   `json:"credentialProfile"`
 	DiscoverDependencies bool     `json:"discoverDependencies"`

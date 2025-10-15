@@ -75,4 +75,6 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 	configCmd.AddCommand(configSetCmd)
 	configCmd.AddCommand(configGetCmd)
+
+	configCmd.Flags().SortFlags = false
 }

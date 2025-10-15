@@ -12,7 +12,7 @@ type CliEnrichedTestExecutionResult struct {
 	TestComponentID   string    `json:"testComponentId"`
 	TestComponentName *string   `json:"testComponentName,omitempty"`
 	Status            string    `json:"status"` // "SUCCESS" or "FAILURE"
-	Log               *string   `json:"log,omitempty"`
+	Message           *string   `json:"message,omitempty"`
 	ExecutedAt        time.Time `json:"executedAt"`
 }
 

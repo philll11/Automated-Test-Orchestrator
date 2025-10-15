@@ -54,15 +54,19 @@ var mappingsAddCmd = &cobra.Command{
 
 		apiClient := client.NewAPIClient(viper.GetString("api_url"))
 		mainID, _ := cmd.Flags().GetString("mainId")
+		mainName, _ := cmd.Flags().GetString("main-name")
 		testID, _ := cmd.Flags().GetString("testId")
-		name, _ := cmd.Flags().GetString("name")
+		testName, _ := cmd.Flags().GetString("test-name")
 
 		req := model.CreateMappingRequest{
 			MainComponentID: mainID,
 			TestComponentID: testID,
 		}
-		if name != "" {
-			req.TestComponentName = &name
+		if mainName != "" {
+			req.MainComponentName = &mainName
+		}
+		if testName != "" {
+			req.TestComponentName = &testName
 		}
 
 		newMapping, err := apiClient.CreateMapping(req)
@@ -164,8 +168,9 @@ func init() {
 	// Add command with flags
 	mappingsCmd.AddCommand(mappingsAddCmd)
 	mappingsAddCmd.Flags().String("mainId", "", "The main component ID (required)")
+	mappingsAddCmd.Flags().String("main-name", "", "An optional descriptive name for the main component")
 	mappingsAddCmd.Flags().String("testId", "", "The test component ID (required)")
-	mappingsAddCmd.Flags().String("name", "", "An optional descriptive name for the test")
+	mappingsAddCmd.Flags().String("test-name", "", "An optional descriptive name for the test component")
 	mappingsAddCmd.MarkFlagRequired("mainId")
 	mappingsAddCmd.MarkFlagRequired("testId")
 

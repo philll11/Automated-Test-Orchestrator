@@ -34,20 +34,25 @@ func PrintCredentialProfiles(profiles []model.CliCredentialProfile) {
 // PrintMappings renders a list of mappings in a table.
 func PrintMappings(mappings []model.CliMapping) {
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Mapping ID", "Main Component ID", "Test Component ID", "Test Component Name"})
+	table.SetHeader([]string{"Mapping ID", "Main Component ID", "Main Component Name", "Test Component ID", "Test Component Name"})
 	table.SetBorder(true)
 	table.SetRowLine(true)
 
 	for _, m := range mappings {
-		name := "N/A"
+		mainName := "N/A"
+		if m.MainComponentName != nil {
+			mainName = *m.MainComponentName
+		}
+		testName := "N/A"
 		if m.TestComponentName != nil {
-			name = *m.TestComponentName
+			testName = *m.TestComponentName
 		}
 		row := []string{
 			m.ID,
 			m.MainComponentID,
+			mainName,
 			m.TestComponentID,
-			name,
+			testName,
 		}
 		table.Append(row)
 	}
@@ -58,12 +63,13 @@ func PrintMappings(mappings []model.CliMapping) {
 // PrintTestPlanSummaries renders a list of test plan summaries in a table.
 func PrintTestPlanSummaries(plans []model.CliTestPlanSummary) {
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Plan ID", "Status", "Created At"})
+	table.SetHeader([]string{"Plan ID", "Name", "Status", "Created At"})
 	table.SetBorder(true)
 
 	for _, p := range plans {
 		row := []string{
 			p.ID,
+			p.Name,
 			p.Status,
 			p.CreatedAt.Local().Format("2006-01-02 15:04:05"), // Format time for readability
 		}
@@ -78,9 +84,10 @@ func PrintTestPlanDetails(plan *model.CliTestPlan) {
 	// --- Plan Summary Table ---
 	fmt.Println("\n--- Plan Summary ---")
 	summaryTable := tablewriter.NewWriter(os.Stdout)
-	summaryTable.SetHeader([]string{"ID", "Status", "Created At"})
+	summaryTable.SetHeader([]string{"ID", "Name", "Status", "Created At"})
 	summaryTable.Append([]string{
 		plan.ID,
+		plan.Name,
 		plan.Status,
 		plan.CreatedAt.Local().Format("2006-01-02 15:04:05"),
 	})
@@ -127,15 +134,15 @@ func PrintTestPlanDetails(plan *model.CliTestPlan) {
 			if res.Status == "SUCCESS" {
 				status = color.GreenString(res.Status)
 			}
-			hasLog := "No"
-			if res.Log != nil && *res.Log != "" {
-				hasLog = "Yes"
+			hasMessage := "No"
+			if res.Message != nil && *res.Message != "" {
+				hasMessage = "Yes"
 			}
 			allResults = append(allResults, map[string]string{
 				"Component Name": name,
 				"Test ID":        res.TestComponentID,
 				"Status":         status,
-				"Has Log":        hasLog,
+				"Has Message":    hasMessage,
 			})
 		}
 	}
@@ -143,9 +150,9 @@ func PrintTestPlanDetails(plan *model.CliTestPlan) {
 	if len(allResults) > 0 {
 		fmt.Println("\n--- Test Execution Results ---")
 		resultsTable := tablewriter.NewWriter(os.Stdout)
-		resultsTable.SetHeader([]string{"Component Name", "Test ID", "Status", "Has Log"})
+		resultsTable.SetHeader([]string{"Component Name", "Test ID", "Status", "Has Message"})
 		for _, res := range allResults {
-			resultsTable.Append([]string{res["Component Name"], res["Test ID"], res["Status"], res["Has Log"]})
+			resultsTable.Append([]string{res["Component Name"], res["Test ID"], res["Status"], res["Has Message"]})
 		}
 		resultsTable.Render()
 	} else {
@@ -198,7 +205,7 @@ func PrintDiscoveryResult(plan *model.CliTestPlan) {
 // PrintExecutionResults renders a list of enriched test execution results in a table.
 func PrintExecutionResults(results []model.CliEnrichedTestExecutionResult) {
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Test Plan ID", "Component Name", "Test Name", "Status", "Executed At", "Log"})
+	table.SetHeader([]string{"Test Plan ID", "Component Name", "Test Name", "Status", "Executed At", "Message"})
 	table.SetBorder(true)
 
 	for _, r := range results {
@@ -214,9 +221,9 @@ func PrintExecutionResults(results []model.CliEnrichedTestExecutionResult) {
 		if r.Status == "SUCCESS" {
 			status = color.GreenString("✅ SUCCESS")
 		}
-		hasLog := "No"
-		if r.Log != nil && *r.Log != "" {
-			hasLog = "Yes"
+		hasMessage := "No"
+		if r.Message != nil && *r.Message != "" {
+			hasMessage = "Yes"
 		}
 
 		row := []string{
@@ -225,7 +232,7 @@ func PrintExecutionResults(results []model.CliEnrichedTestExecutionResult) {
 			testName,
 			status,
 			r.ExecutedAt.Local().Format("2006-01-02 15:04:05"),
-			hasLog,
+			hasMessage,
 		}
 		table.Append(row)
 	}

@@ -55,6 +55,13 @@ func ParseMappingCsv(reader io.Reader) ([]model.CreateMappingRequest, error) {
 		}
 
 		// Handle optional fields
+		if idx, ok := headerMap["mainComponentName"]; ok && idx < len(row) {
+			name := row[idx]
+			if name != "" {
+				mapping.MainComponentName = &name
+			}
+		}
+
 		if idx, ok := headerMap["testComponentName"]; ok && idx < len(row) {
 			name := row[idx]
 			if name != "" {

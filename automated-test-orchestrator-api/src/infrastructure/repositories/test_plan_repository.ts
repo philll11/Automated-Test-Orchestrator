@@ -13,13 +13,13 @@ export class TestPlanRepository implements ITestPlanRepository {
     constructor(@inject(TYPES.PostgresPool) private pool: Pool) { }
 
     async save(testPlan: TestPlan): Promise<TestPlan> {
-        const { id, status, createdAt, updatedAt } = testPlan;
+        const { id, name, status, createdAt, updatedAt } = testPlan;
         const query = `
-            INSERT INTO test_plans (id, status, created_at, updated_at)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO test_plans (id, name, status, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5)
             RETURNING *;
         `;
-        const values = [id, status, createdAt, updatedAt];
+        const values = [id, name, status, createdAt, updatedAt];
         const result = await this.pool.query(query, values);
         return rowToTestPlan(result.rows[0]);
     }
@@ -44,6 +44,7 @@ export class TestPlanRepository implements ITestPlanRepository {
 
         return rowToTestPlan(result.rows[0]);
     }
+
     async findAll(): Promise<TestPlan[]> {
         const query = 'SELECT * FROM test_plans ORDER BY created_at DESC;';
         const result = await this.pool.query(query);

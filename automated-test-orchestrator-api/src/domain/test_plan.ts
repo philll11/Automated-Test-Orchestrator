@@ -10,6 +10,7 @@ export type TestPlanStatus =
 
 export interface TestPlan {
   id: string;
+  name: string;
   status: TestPlanStatus;
   failureReason?: string;
   createdAt: Date;

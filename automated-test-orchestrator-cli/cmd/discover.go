@@ -28,6 +28,7 @@ or interactively if no other input is given.`,
 		s.Suffix = " Preparing test plan..."
 		s.Start()
 
+		name, _ := cmd.Flags().GetString("name")
 		fromCsv, _ := cmd.Flags().GetString("from-csv")
 		dependencies, _ := cmd.Flags().GetBool("dependencies")
 		creds, _ := cmd.Flags().GetString("creds")
@@ -72,10 +73,10 @@ or interactively if no other input is given.`,
 		if dependencies {
 			discoveryMode = " and all their dependencies"
 		}
-		s.Suffix = fmt.Sprintf(" Creating test plan with %d component(s)%s...", len(componentIds), discoveryMode)
+		s.Suffix = fmt.Sprintf(" Creating test plan '%s' with %d component(s)%s...", name, len(componentIds), discoveryMode)
 
 		apiClient := client.NewAPIClient(viper.GetString("api_url"))
-		planID, err := apiClient.InitiateDiscovery(componentIds, creds, dependencies)
+		planID, err := apiClient.InitiateDiscovery(name, componentIds, creds, dependencies)
 		if err != nil {
 			s.Stop()
 			color.Red("\nError: Failed to initiate discovery: %v", err)
@@ -96,8 +97,8 @@ or interactively if no other input is given.`,
 		}
 
 		s.Stop()
-		color.Green("✅ Test plan processing complete!")
-		fmt.Printf("\nTest Plan ID: %s\n\n", color.CyanString(planID))
+		color.Green("✅ Test plan '%s' processing complete!", finalPlan.Name)
+		fmt.Printf("\nTest Plan ID: %s\n", color.CyanString(planID))
 		display.PrintDiscoveryResult(finalPlan)
 		color.Yellow("\nTo execute tests, use the 'execute' command with the Plan ID.")
 	},
@@ -128,8 +129,13 @@ func promptForComponentIDs(dependencies bool) ([]string, error) {
 
 func init() {
 	rootCmd.AddCommand(discoverCmd)
+	discoverCmd.Flags().String("name", "", "A descriptive name for the test plan (required)")
 	discoverCmd.Flags().String("from-csv", "", "Path to a CSV file with a single column of 'componentId's")
 	discoverCmd.Flags().Bool("dependencies", false, "Discover all dependencies for the provided components")
 	discoverCmd.Flags().String("creds", "", "The name of the credential profile to use (required)")
+
+	discoverCmd.MarkFlagRequired("name")
 	discoverCmd.MarkFlagRequired("creds")
+
+	discoverCmd.Flags().SortFlags = false
 }

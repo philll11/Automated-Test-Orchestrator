@@ -27,6 +27,7 @@ var resultsCmd = &cobra.Command{
 			TestComponentID:       cmd.Flag("testId").Value.String(),
 			Status:                cmd.Flag("status").Value.String(),
 		}
+		verbose, _ := cmd.Flags().GetBool("verbose")
 
 		apiClient := client.NewAPIClient(viper.GetString("api_url"))
 		results, err := apiClient.GetExecutionResults(filters)
@@ -40,7 +41,11 @@ var resultsCmd = &cobra.Command{
 			return
 		}
 
-		display.PrintExecutionResults(results)
+		if verbose {
+			display.PrintVerboseResults(results)
+		} else {
+			display.PrintExecutionResults(results)
+		}
 	},
 }
 
@@ -51,4 +56,7 @@ func init() {
 	resultsCmd.Flags().String("componentId", "", "Filter results by a specific Discovered Component ID")
 	resultsCmd.Flags().String("testId", "", "Filter results by a specific Test Component ID")
 	resultsCmd.Flags().String("status", "", "Filter results by status (SUCCESS or FAILURE)")
+	resultsCmd.Flags().BoolP("verbose", "v", false, "Display a detailed report of failed tests and their error messages")
+
+	resultsCmd.Flags().SortFlags = false
 }

@@ -41,9 +41,10 @@ export class TestPlanService implements ITestPlanService {
         this.platformServiceFactory = platformServiceFactory;
     }
 
-    public async initiateDiscovery(componentIds: string[], credentialProfile: string, discoverDependencies: boolean): Promise<TestPlan> {
+    public async initiateDiscovery(name: string, componentIds: string[], credentialProfile: string, discoverDependencies: boolean): Promise<TestPlan> {
         const testPlan: TestPlan = {
             id: uuidv4(),
+            name: name,
             status: 'DISCOVERING',
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -190,7 +191,7 @@ export class TestPlanService implements ITestPlanService {
                     planComponentId: planComponent.id,
                     testComponentId: testId,
                     status: result.status,
-                    log: result.message,
+                    message: result.message,
                 };
                 await this.testExecutionResultRepository.save(newResult);
             });

@@ -3,6 +3,7 @@
 export interface Mapping {
   id: string;
   mainComponentId: string;
+  mainComponentName?: string;
   testComponentId: string;
   testComponentName?: string;
   isDeployed?: boolean;

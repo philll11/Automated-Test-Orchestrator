@@ -17,6 +17,9 @@ import { BadRequestError, NotFoundError } from '../utils/app_error.js';
  *           type: string
  *           format: uuid
  *           description: The unique identifier for the test plan.
+ *         name:
+ *           type: string
+ *           description: A user-defined name for the test plan.
  *         status:
  *           type: string
  *           enum: [DISCOVERING, AWAITING_SELECTION, EXECUTING, COMPLETED, DISCOVERY_FAILED, EXECUTION_FAILED]
@@ -118,9 +121,14 @@ export class TestPlanController {
      *           schema:
      *             type: object
      *             required:
+     *               - name
      *               - componentIds
      *               - credentialProfile
      *             properties:
+     *               name:
+     *                 type: string
+     *                 description: "A descriptive name for the test plan."
+     *                 example: "Pre-Release v2.1 Smoke Test"
      *               componentIds:
      *                 type: array
      *                 items:
@@ -146,13 +154,14 @@ export class TestPlanController {
      *         description: Bad Request. Missing or invalid required fields.
      */
     public async initiateDiscovery(req: Request, res: Response): Promise<void> {
-        const { componentIds, credentialProfile, discoverDependencies } = req.body;
+        const { name, componentIds, credentialProfile, discoverDependencies } = req.body;
 
-        if (!credentialProfile || !Array.isArray(componentIds) || componentIds.length === 0) {
-            throw new BadRequestError('credentialProfile and a non-empty componentIds array are required');
+        if (!name || typeof name !== 'string' || !credentialProfile || !Array.isArray(componentIds) || componentIds.length === 0) {
+            throw new BadRequestError('A non-empty name, credentialProfile, and a non-empty componentIds array are required');
         }
 
         const testPlan = await this.testPlanService.initiateDiscovery(
+            name,
             componentIds,
             credentialProfile,
             discoverDependencies ?? false // Default to false if undefined

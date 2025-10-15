@@ -13,7 +13,7 @@ export class TestExecutionResultRepository implements ITestExecutionResultReposi
     constructor(@inject(TYPES.PostgresPool) private pool: Pool) {}
 
     async save(newResult: NewTestExecutionResult): Promise<TestExecutionResult> {
-        const { testPlanId, planComponentId, testComponentId, status, log } = newResult;
+        const { testPlanId, planComponentId, testComponentId, status, message } = newResult;
 
         const result = {
             id: uuidv4(),
@@ -21,16 +21,16 @@ export class TestExecutionResultRepository implements ITestExecutionResultReposi
             planComponentId,
             testComponentId,
             status,
-            log,
+            message,
             executedAt: new Date(),
         };
 
         const query = `
-            INSERT INTO test_execution_results (id, test_plan_id, plan_component_id, test_component_id, status, log, executed_at)
+            INSERT INTO test_execution_results (id, test_plan_id, plan_component_id, test_component_id, status, message, executed_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *;
         `;
-        const values = [result.id, result.testPlanId, result.planComponentId, result.testComponentId, result.status, result.log, result.executedAt];
+        const values = [result.id, result.testPlanId, result.planComponentId, result.testComponentId, result.status, result.message, result.executedAt];
         
         const dbResult = await this.pool.query(query, values);
         
@@ -45,7 +45,7 @@ export class TestExecutionResultRepository implements ITestExecutionResultReposi
         const query = `
             SELECT
                 ter.id, ter.test_plan_id, ter.plan_component_id, ter.test_component_id,
-                ter.status, ter.log, ter.executed_at,
+                ter.status, ter.message, ter.executed_at,
                 pc.component_name,
                 m.test_component_name
             FROM test_execution_results ter
@@ -88,7 +88,7 @@ export class TestExecutionResultRepository implements ITestExecutionResultReposi
         const query = `
             SELECT
                 ter.id, ter.test_plan_id, ter.plan_component_id, ter.test_component_id,
-                ter.status, ter.log, ter.executed_at,
+                ter.status, ter.message, ter.executed_at,
                 pc.component_name,
                 m.test_component_name
             FROM test_execution_results ter

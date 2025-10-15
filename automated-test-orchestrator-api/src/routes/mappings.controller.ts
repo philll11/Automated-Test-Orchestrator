@@ -21,6 +21,10 @@ import { UpdateMappingData } from '../ports/i_mapping_repository.js';
  *         mainComponentId:
  *           type: string
  *           description: The ID of the main component being tested.
+ *         mainComponentName:
+ *           type: string
+ *           nullable: true
+ *           description: The human-readable name of the main component.
  *         testComponentId:
  *           type: string
  *           description: The ID of the component that acts as a test.
@@ -83,6 +87,9 @@ export class MappingsController {
      *               mainComponentId:
      *                 type: string
      *                 example: "abc-123"
+     *               mainComponentName:
+     *                 type: string
+     *                 example: "Main Process ABC"
      *               testComponentId:
      *                 type: string
      *                 example: "test-abc-123"
@@ -104,11 +111,11 @@ export class MappingsController {
      *               $ref: '#/components/schemas/ApiResponse_Mapping'
      */
     async createMapping(req: Request, res: Response): Promise<void> {
-        const { mainComponentId, testComponentId, testComponentName, isDeployed, isPackaged } = req.body;
+        const { mainComponentId, mainComponentName, testComponentId, testComponentName, isDeployed, isPackaged } = req.body;
         if (!mainComponentId || !testComponentId) {
             throw new BadRequestError('mainComponentId and testComponentId are required');
         }
-        const newMapping = await this.mappingService.createMapping({ mainComponentId, testComponentId, testComponentName, isDeployed, isPackaged });
+        const newMapping = await this.mappingService.createMapping({ mainComponentId, mainComponentName, testComponentId, testComponentName, isDeployed, isPackaged });
         res.status(201).json({ metadata: { code: 201, message: 'Created' }, data: newMapping });
     }
 
@@ -212,6 +219,9 @@ export class MappingsController {
      *           schema:
      *             type: object
      *             properties:
+     *               mainComponentName:
+     *                 type: string
+     *                 example: "Updated Main Process ABC"
      *               testComponentId:
      *                 type: string
      *                 example: "test-abc-123-v2"
@@ -236,10 +246,11 @@ export class MappingsController {
      */
     async updateMapping(req: Request, res: Response): Promise<void> {
         const { mappingId } = req.params;
-        const { testComponentId, testComponentName, isDeployed, isPackaged } = req.body;
+        const { mainComponentName, testComponentId, testComponentName, isDeployed, isPackaged } = req.body;
         
         // Build the update object with only the fields that were provided
         const updateData: UpdateMappingData = {};
+        if (mainComponentName !== undefined) updateData.mainComponentName = mainComponentName;
         if (testComponentId !== undefined) updateData.testComponentId = testComponentId;
         if (testComponentName !== undefined) updateData.testComponentName = testComponentName;
         if (isDeployed !== undefined) updateData.isDeployed = isDeployed;

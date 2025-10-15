@@ -1,4 +1,4 @@
-// src/infrastructure/repositories/component_test_mapping_repository.ts
+// src/infrastructure/repositories/mapping_repository.ts
 
 import type { Pool } from 'pg';
 import { injectable, inject } from 'inversify';
@@ -12,12 +12,12 @@ export class MappingRepository implements IMappingRepository {
     constructor(@inject(TYPES.PostgresPool) private pool: Pool) {}
 
     async create(mapping: Omit<Mapping, 'createdAt' | 'updatedAt'>): Promise<Mapping> {
-        const { id, mainComponentId, testComponentId, testComponentName, isDeployed, isPackaged } = mapping;
+        const { id, mainComponentId, mainComponentName, testComponentId, testComponentName, isDeployed, isPackaged } = mapping;
         const now = new Date();
         const query = `
-            INSERT INTO mappings (id, main_component_id, test_component_id, test_component_name, is_deployed, is_packaged, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *;`;
-        const values = [id, mainComponentId, testComponentId, testComponentName, isDeployed, isPackaged, now, now];
+            INSERT INTO mappings (id, main_component_id, main_component_name, test_component_id, test_component_name, is_deployed, is_packaged, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *;`;
+        const values = [id, mainComponentId, mainComponentName, testComponentId, testComponentName, isDeployed, isPackaged, now, now];
         const result = await this.pool.query(query, values);
         return rowToMapping(result.rows[0]);
     }
@@ -60,11 +60,11 @@ export class MappingRepository implements IMappingRepository {
         
         const query = `
             UPDATE mappings
-            SET test_component_id = $1, test_component_name = $2, is_deployed = $3, is_packaged = $4, updated_at = $5
-            WHERE id = $6
+            SET main_component_name = $1, test_component_id = $2, test_component_name = $3, is_deployed = $4, is_packaged = $5, updated_at = $6
+            WHERE id = $7
             RETURNING *;
         `;
-        const values = [newValues.testComponentId, newValues.testComponentName, newValues.isDeployed, newValues.isPackaged, newValues.updatedAt, id];
+        const values = [newValues.mainComponentName, newValues.testComponentId, newValues.testComponentName, newValues.isDeployed, newValues.isPackaged, newValues.updatedAt, id];
 
         const result = await this.pool.query(query, values);
         return rowToMapping(result.rows[0]);

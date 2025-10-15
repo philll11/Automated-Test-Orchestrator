@@ -8,6 +8,6 @@ export interface TestExecutionResult {
   testComponentId: string;
   testComponentName?: string; // From a joined Mapping
   status: 'SUCCESS' | 'FAILURE';
-  log?: string;
+  message?: string;
   executedAt: Date;
 }

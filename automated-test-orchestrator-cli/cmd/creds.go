@@ -86,11 +86,11 @@ var credsListCmd = &cobra.Command{
 	},
 }
 
-// credsDeleteCmd represents the 'creds delete' command.
-var credsDeleteCmd = &cobra.Command{
-	Use:   "delete <profile>",
-	Short: "Delete a credential profile",
-	Long:  `Deletes a credential profile by its name.`,
+// credsRemoveCmd represents the 'creds remove' command.
+var credsRemoveCmd = &cobra.Command{
+	Use:   "rm <profile>",
+	Short: "Remove a credential profile",
+	Long:  `Removes a credential profile by its name.`,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		profileName := args[0]
@@ -135,5 +135,7 @@ func init() {
 
 	credsCmd.AddCommand(credsAddCmd)
 	credsCmd.AddCommand(credsListCmd)
-	credsCmd.AddCommand(credsDeleteCmd)
+	credsCmd.AddCommand(credsRemoveCmd)
+
+	credsCmd.Flags().SortFlags = false
 }

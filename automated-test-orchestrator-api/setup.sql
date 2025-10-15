@@ -5,6 +5,7 @@
 -- Stores the master record for a single orchestration session.
 CREATE TABLE test_plans (
     id UUID PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
     status VARCHAR(50) NOT NULL,
     failure_reason TEXT,
     created_at TIMESTAMP NOT NULL,
@@ -42,6 +43,7 @@ CREATE TABLE plan_components (
 CREATE TABLE mappings (
     id UUID PRIMARY KEY,
     main_component_id VARCHAR(255) NOT NULL,
+    main_component_name VARCHAR(255),
     test_component_id VARCHAR(255) NOT NULL,
     test_component_name VARCHAR(255),
     is_deployed BOOLEAN DEFAULT FALSE,
@@ -58,7 +60,7 @@ CREATE TABLE test_execution_results (
     plan_component_id UUID NOT NULL,
     test_component_id VARCHAR(255) NOT NULL,
     status VARCHAR(50) NOT NULL,
-    log TEXT,
+    message TEXT,
     executed_at TIMESTAMP NOT NULL,
     CONSTRAINT fk_test_plan
         FOREIGN KEY(test_plan_id)

@@ -7,8 +7,9 @@ import "time"
 type CliMapping struct {
 	ID                string    `json:"id"`
 	MainComponentID   string    `json:"mainComponentId"`
+	MainComponentName *string   `json:"mainComponentName,omitempty"`
 	TestComponentID   string    `json:"testComponentId"`
-	TestComponentName *string   `json:"testComponentName,omitempty"` // Use a pointer for optional fields
+	TestComponentName *string   `json:"testComponentName,omitempty"`
 	IsDeployed        *bool     `json:"isDeployed,omitempty"`
 	IsPackaged        *bool     `json:"isPackaged,omitempty"`
 	CreatedAt         time.Time `json:"createdAt"`
@@ -18,6 +19,7 @@ type CliMapping struct {
 // CreateMappingRequest is the structure for the POST /mappings request body.
 type CreateMappingRequest struct {
 	MainComponentID   string  `json:"mainComponentId"`
+	MainComponentName *string `json:"mainComponentName,omitempty"`
 	TestComponentID   string  `json:"testComponentId"`
 	TestComponentName *string `json:"testComponentName,omitempty"`
 	IsDeployed        *bool   `json:"isDeployed,omitempty"`

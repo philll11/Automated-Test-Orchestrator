@@ -65,11 +65,11 @@ var testPlansGetCmd = &cobra.Command{
 	},
 }
 
-// testPlansDeleteCmd represents the 'test-plans delete' command.
-var testPlansDeleteCmd = &cobra.Command{
-	Use:   "delete <planId>",
-	Short: "Delete a test plan by its ID",
-	Long:  `Deletes a test plan and all of its associated data, including components and execution results.`,
+// testPlansRemoveCmd represents the 'test-plans remove' command.
+var testPlansRemoveCmd = &cobra.Command{
+	Use:   "rm <planId>",
+	Short: "Remove a test plan by its ID",
+	Long:  `Removes a test plan and all of its associated data, including components and execution results.`,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		planID := args[0]
@@ -83,7 +83,7 @@ var testPlansDeleteCmd = &cobra.Command{
 		}
 
 		s.Stop()
-		color.Green("✅ Test plan \"%s\" was successfully deleted.", planID)
+		color.Green("✅ Test plan \"%s\" was successfully removed.", planID)
 	},
 }
 
@@ -91,5 +91,7 @@ func init() {
 	rootCmd.AddCommand(testPlansCmd)
 	testPlansCmd.AddCommand(testPlansListCmd)
 	testPlansCmd.AddCommand(testPlansGetCmd)
-	testPlansCmd.AddCommand(testPlansDeleteCmd)
+	testPlansCmd.AddCommand(testPlansRemoveCmd)
+
+	testPlansCmd.Flags().SortFlags = false
 }

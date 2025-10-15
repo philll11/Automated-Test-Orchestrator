@@ -14,6 +14,7 @@ export function rowToTestPlan(row: any): TestPlan {
   if (!row) return row;
   return {
     id: row.id,
+    name: row.name,
     status: row.status,
     failureReason: row.failure_reason,
     createdAt: row.created_at,
@@ -47,10 +48,11 @@ export function rowToMapping(row: any): Mapping {
   return {
     id: row.id,
     mainComponentId: row.main_component_id,
+    mainComponentName: row.main_component_name,
     testComponentId: row.test_component_id,
     testComponentName: row.test_component_name,
     isDeployed: row.is_deployed,
-    isPackaged: row.is_package,
+    isPackaged: row.is_packaged,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -72,7 +74,7 @@ export function rowToTestExecutionResult(row: any): TestExecutionResult {
     testComponentId: row.test_component_id,
     testComponentName: row.test_component_name,
     status: row.status,
-    log: row.log,
+    message: row.message,
     executedAt: row.executed_at,
   };
 }
