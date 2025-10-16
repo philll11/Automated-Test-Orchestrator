@@ -7,7 +7,7 @@ export type NewTestExecutionResult = Omit<TestExecutionResult, 'id' | 'executedA
 
 export interface TestExecutionResultFilters {
   testPlanId?: string;
-  planComponentId?: string;
+  componentId?: string;
   testComponentId?: string;
   status?: 'SUCCESS' | 'FAILURE';
 }

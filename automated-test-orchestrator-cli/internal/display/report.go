@@ -13,39 +13,77 @@ import (
 func PrintExecutionReport(plan *model.CliTestPlan) {
 	fmt.Println("\n--- Test Execution Report ---")
 
-	var allResults []model.CliTestExecutionResult
-	for _, c := range plan.PlanComponents {
-		allResults = append(allResults, c.ExecutionResults...)
-	}
+	var executedTestCount int
+	var totalFailureCount int
 
-	if len(allResults) == 0 {
-		color.Yellow("No tests were executed. Ensure the test IDs provided are correct.")
-		return
-	}
+	// Iterate through components to group the report by the main component.
+	for _, component := range plan.PlanComponents {
+		if len(component.ExecutionResults) == 0 {
+			continue // Skip components for which no tests were run.
+		}
 
-	failures := 0
-	for _, result := range allResults {
-		if result.Status == "SUCCESS" {
-			fmt.Printf("%s %s\n", color.GreenString("PASS"), result.TestComponentID)
-		} else {
-			failures++
-			fmt.Printf("%s %s\n", color.RedString("FAIL"), result.TestComponentID)
-			if result.Message != nil && *result.Message != "" {
-				indentedMessage := "  > " + strings.ReplaceAll(*result.Message, "\n", "\n  > ")
-				fmt.Println(color.HiBlackString(indentedMessage))
+		componentHasFailure := false
+		for _, result := range component.ExecutionResults {
+			executedTestCount++
+			if result.Status == "FAILURE" {
+				componentHasFailure = true
+				totalFailureCount++
+			}
+		}
+
+		componentName := component.ComponentID
+		if component.ComponentName != nil && *component.ComponentName != "" {
+			componentName = *component.ComponentName
+		}
+
+		headerColor := color.New(color.FgGreen, color.Bold)
+		headerText := "PASS"
+		if componentHasFailure {
+			headerColor = color.New(color.FgRed, color.Bold)
+			headerText = "FAIL"
+		}
+		headerColor.Printf("\n%s", headerText)
+		fmt.Printf(" %s\n", componentName)
+
+		// Print the individual test results for this component.
+		for _, result := range component.ExecutionResults {
+			testName := result.TestComponentID // Fallback to ID
+			if result.TestComponentName != nil && *result.TestComponentName != "" {
+				testName = *result.TestComponentName
+			}
+
+			if result.Status == "SUCCESS" {
+				fmt.Printf("  %s %s\n", color.GreenString("✅ PASS"), color.HiBlackString(testName))
+			} else {
+				fmt.Printf("  %s %s\n", color.RedString("❌ FAIL"), testName)
+				if result.Message != nil && *result.Message != "" {
+					// Indent the error message for readability
+					indentedMessage := "    " + strings.ReplaceAll(*result.Message, "\n", "\n    ")
+					fmt.Println(color.RedString(indentedMessage))
+				}
 			}
 		}
 	}
 
-	fmt.Println("\n--- Summary ---")
-	if failures > 0 {
-		color.Red("%d test(s) failed.", failures)
+	if executedTestCount == 0 {
+		color.Yellow("No tests were executed. Ensure the test IDs provided are correct or that mappings exist.")
+		return
 	}
-	color.Green("%d test(s) passed.", len(allResults)-failures)
-	fmt.Printf("Total tests executed: %d\n", len(allResults))
+
+	// Print the final summary of all tests executed.
+	fmt.Println("\n--- Summary ---")
+	successCount := executedTestCount - totalFailureCount
+	if totalFailureCount > 0 {
+		color.Red("%d test(s) failed.", totalFailureCount)
+	}
+	if successCount > 0 {
+		color.Green("%d test(s) passed.", successCount)
+	}
+	fmt.Printf("Total tests executed: %d\n", executedTestCount)
 }
 
-// PrintVerboseResults renders a detailed list of failed tests and their messages.
+// (PrintVerboseResults remains unchanged)
+// ...
 func PrintVerboseResults(results []model.CliEnrichedTestExecutionResult) {
 	var failures []model.CliEnrichedTestExecutionResult
 	successCount := 0

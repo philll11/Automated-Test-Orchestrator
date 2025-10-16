@@ -164,10 +164,10 @@ export class TestPlanService implements ITestPlanService {
             const allAvailableTestsMap = await this.mappingRepository.findAllTestsForMainComponents(planComponents.map(c => c.componentId));
 
             const testToPlanComponentMap = new Map<string, PlanComponent>();
-            allAvailableTestsMap.forEach((testIds, mainComponentId) => {
+            allAvailableTestsMap.forEach((tests, mainComponentId) => {
                 const planComponent = planComponents.find(pc => pc.componentId === mainComponentId);
                 if (planComponent) {
-                    testIds.forEach(testId => testToPlanComponentMap.set(testId, planComponent));
+                    tests.forEach(test => testToPlanComponentMap.set(test.id, planComponent));
                 }
             });
 
@@ -176,7 +176,8 @@ export class TestPlanService implements ITestPlanService {
             if (testsToRun && testsToRun.length > 0) {
                 finalTestsToExecute = testsToRun;
             } else {
-                finalTestsToExecute = Array.from(allAvailableTestsMap.values()).flat();
+                // Flatten the map values and extract just the test IDs for execution
+                finalTestsToExecute = Array.from(allAvailableTestsMap.values()).flat().map(test => test.id);
             }
 
             const executionPromises = finalTestsToExecute.map(async (testId) => {

@@ -103,19 +103,35 @@ func PrintTestPlanDetails(plan *model.CliTestPlan) {
 	if len(plan.PlanComponents) > 0 {
 		fmt.Println("\n--- Plan Components & Test Coverage ---")
 		componentsTable := tablewriter.NewWriter(os.Stdout)
-		componentsTable.SetHeader([]string{"Component ID", "Component Name", "Available Tests"})
+		componentsTable.SetHeader([]string{"Component ID", "Component Name", "Available Test Name", "Available Test ID"})
 		componentsTable.SetRowLine(true)
 
 		for _, c := range plan.PlanComponents {
-			name := "N/A"
+			componentName := "N/A"
 			if c.ComponentName != nil {
-				name = *c.ComponentName
+				componentName = *c.ComponentName
 			}
-			tests := "None"
-			if len(c.AvailableTests) > 0 {
-				tests = strings.Join(c.AvailableTests, ", ")
+
+			var testNamesBuilder, testIDsBuilder strings.Builder
+			if len(c.AvailableTests) == 0 {
+				testNamesBuilder.WriteString("None")
+				testIDsBuilder.WriteString("N/A")
+			} else {
+				for i, test := range c.AvailableTests {
+					testName := "N/A"
+					if test.Name != nil && *test.Name != "" {
+						testName = *test.Name
+					}
+					testNamesBuilder.WriteString(testName)
+					testIDsBuilder.WriteString(test.ID)
+
+					if i < len(c.AvailableTests)-1 {
+						testNamesBuilder.WriteString("\n")
+						testIDsBuilder.WriteString("\n")
+					}
+				}
 			}
-			componentsTable.Append([]string{c.ComponentID, name, tests})
+			componentsTable.Append([]string{c.ComponentID, componentName, testNamesBuilder.String(), testIDsBuilder.String()})
 		}
 		componentsTable.Render()
 	} else {
@@ -123,36 +139,45 @@ func PrintTestPlanDetails(plan *model.CliTestPlan) {
 	}
 
 	// --- Execution Results Table ---
-	var allResults []map[string]string
+	var allResults []model.CliTestExecutionResult
 	for _, pc := range plan.PlanComponents {
-		for _, res := range pc.ExecutionResults {
-			name := "N/A"
-			if pc.ComponentName != nil {
-				name = *pc.ComponentName
-			}
-			status := color.RedString(res.Status)
-			if res.Status == "SUCCESS" {
-				status = color.GreenString(res.Status)
-			}
-			hasMessage := "No"
-			if res.Message != nil && *res.Message != "" {
-				hasMessage = "Yes"
-			}
-			allResults = append(allResults, map[string]string{
-				"Component Name": name,
-				"Test ID":        res.TestComponentID,
-				"Status":         status,
-				"Has Message":    hasMessage,
-			})
-		}
+		allResults = append(allResults, pc.ExecutionResults...)
 	}
 
 	if len(allResults) > 0 {
 		fmt.Println("\n--- Test Execution Results ---")
 		resultsTable := tablewriter.NewWriter(os.Stdout)
-		resultsTable.SetHeader([]string{"Component Name", "Test ID", "Status", "Has Message"})
+		resultsTable.SetHeader([]string{"Component Name", "Test Name", "Test ID", "Status", "Has Message"})
+
+		// Create a map to get component names easily
+		componentMap := make(map[string]string)
+		for _, pc := range plan.PlanComponents {
+			for _, res := range pc.ExecutionResults {
+				if _, ok := componentMap[res.ID]; !ok {
+					if pc.ComponentName != nil {
+						componentMap[res.ID] = *pc.ComponentName
+					} else {
+						componentMap[res.ID] = "N/A"
+					}
+				}
+			}
+		}
+
 		for _, res := range allResults {
-			resultsTable.Append([]string{res["Component Name"], res["Test ID"], res["Status"], res["Has Message"]})
+			testName := "N/A"
+			if res.TestComponentName != nil {
+				testName = *res.TestComponentName
+			}
+			status := color.RedString("FAILURE")
+			if res.Status == "SUCCESS" {
+				status = color.GreenString("SUCCESS")
+			}
+			hasMessage := "No"
+			if res.Message != nil && *res.Message != "" {
+				hasMessage = "Yes"
+			}
+
+			resultsTable.Append([]string{componentMap[res.ID], testName, res.TestComponentID, status, hasMessage})
 		}
 		resultsTable.Render()
 	} else {
@@ -168,45 +193,55 @@ func PrintDiscoveryResult(plan *model.CliTestPlan) {
 	}
 
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Component ID", "Component Name", "Has Test Coverage", "Available Test ID"})
+	table.SetHeader([]string{"Component ID", "Component Name", "Has Test Coverage", "Available Test Name", "Available Test ID"})
 	table.SetRowLine(true)
-	table.SetAutoWrapText(true)
 
 	for _, comp := range plan.PlanComponents {
-		name := "N/A"
+		componentName := "N/A"
 		if comp.ComponentName != nil {
-			name = *comp.ComponentName
+			componentName = *comp.ComponentName
 		}
 
-		var coverageStatus, testIDs string
+		var coverageStatus string
+		var testNamesBuilder, testIDsBuilder strings.Builder
 
 		if len(comp.AvailableTests) == 0 {
 			coverageStatus = color.RedString("❌ No")
-			testIDs = "N/A"
+			testNamesBuilder.WriteString("N/A")
+			testIDsBuilder.WriteString("N/A")
 		} else {
 			coverageStatus = color.GreenString("✅ Yes")
-			// Join all test IDs with a newline character to display them in a single cell.
-			testIDs = strings.Join(comp.AvailableTests, "\n")
+			for i, test := range comp.AvailableTests {
+				testName := "N/A"
+				if test.Name != nil && *test.Name != "" {
+					testName = *test.Name
+				}
+				testNamesBuilder.WriteString(testName)
+				testIDsBuilder.WriteString(test.ID)
+				if i < len(comp.AvailableTests)-1 {
+					testNamesBuilder.WriteString("\n")
+					testIDsBuilder.WriteString("\n")
+				}
+			}
 		}
 
-		// Append one consolidated row per component.
 		table.Append([]string{
 			comp.ComponentID,
-			name,
+			componentName,
 			coverageStatus,
-			testIDs,
+			testNamesBuilder.String(),
+			testIDsBuilder.String(),
 		})
 	}
-
 	table.Render()
-
 }
 
 // PrintExecutionResults renders a list of enriched test execution results in a table.
 func PrintExecutionResults(results []model.CliEnrichedTestExecutionResult) {
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Test Plan ID", "Component Name", "Test Name", "Status", "Executed At", "Message"})
+	table.SetHeader([]string{"Test Plan", "Component Name", "Test Name", "Status", "Executed At", "Message"})
 	table.SetBorder(true)
+	table.SetRowLine(true)
 
 	for _, r := range results {
 		componentName := "N/A"
@@ -217,17 +252,25 @@ func PrintExecutionResults(results []model.CliEnrichedTestExecutionResult) {
 		if r.TestComponentName != nil {
 			testName = *r.TestComponentName
 		}
-		status := color.RedString("❌ FAILURE")
-		if r.Status == "SUCCESS" {
-			status = color.GreenString("✅ SUCCESS")
+
+		// Format the Test Plan column
+		testPlanDisplay := r.TestPlanID
+		if r.TestPlanName != nil && *r.TestPlanName != "" {
+			testPlanDisplay = fmt.Sprintf("%s\n(%s)", *r.TestPlanName, r.TestPlanID)
 		}
+
+		status := color.RedString("FAILURE")
+		if r.Status == "SUCCESS" {
+			status = color.GreenString("SUCCESS")
+		}
+
 		hasMessage := "No"
 		if r.Message != nil && *r.Message != "" {
 			hasMessage = "Yes"
 		}
 
 		row := []string{
-			r.TestPlanID,
+			testPlanDisplay,
 			componentName,
 			testName,
 			status,

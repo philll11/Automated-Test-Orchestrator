@@ -22,10 +22,10 @@ var resultsCmd = &cobra.Command{
 
 		// Collect filter values from flags
 		filters := model.GetResultsFilters{
-			TestPlanID:            cmd.Flag("planId").Value.String(),
-			DiscoveredComponentID: cmd.Flag("componentId").Value.String(),
-			TestComponentID:       cmd.Flag("testId").Value.String(),
-			Status:                cmd.Flag("status").Value.String(),
+			TestPlanID:      cmd.Flag("planId").Value.String(),
+			ComponentID:     cmd.Flag("componentId").Value.String(),
+			TestComponentID: cmd.Flag("testId").Value.String(),
+			Status:          cmd.Flag("status").Value.String(),
 		}
 		verbose, _ := cmd.Flags().GetBool("verbose")
 

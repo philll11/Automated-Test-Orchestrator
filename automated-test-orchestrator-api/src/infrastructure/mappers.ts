@@ -69,6 +69,7 @@ export function rowToTestExecutionResult(row: any): TestExecutionResult {
   return {
     id: row.id,
     testPlanId: row.test_plan_id,
+    testPlanName: row.test_plan_name,
     planComponentId: row.plan_component_id,
     componentName: row.component_name,
     testComponentId: row.test_component_id,

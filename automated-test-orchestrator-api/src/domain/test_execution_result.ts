@@ -3,6 +3,7 @@
 export interface TestExecutionResult {
   id: string;
   testPlanId: string; // FK to TestPlan
+  testPlanName?: string; // From the joined TestPlan
   planComponentId: string; // FK to PlanComponent
   componentName?: string; // From the joined PlanComponent
   testComponentId: string;

@@ -46,9 +46,11 @@ export class TestExecutionResultRepository implements ITestExecutionResultReposi
             SELECT
                 ter.id, ter.test_plan_id, ter.plan_component_id, ter.test_component_id,
                 ter.status, ter.message, ter.executed_at,
+                tp.name as test_plan_name,
                 pc.component_name,
                 m.test_component_name
             FROM test_execution_results ter
+            INNER JOIN test_plans tp ON ter.test_plan_id = tp.id
             INNER JOIN plan_components pc ON ter.plan_component_id = pc.id
             LEFT JOIN mappings m ON pc.component_id = m.main_component_id AND ter.test_component_id = m.test_component_id
             WHERE ter.plan_component_id = ANY($1::uuid[])
@@ -67,9 +69,9 @@ export class TestExecutionResultRepository implements ITestExecutionResultReposi
             conditions.push(`ter.test_plan_id = $${paramIndex++}`);
             values.push(filters.testPlanId);
         }
-        if (filters.planComponentId) {
-            conditions.push(`ter.plan_component_id = $${paramIndex++}`);
-            values.push(filters.planComponentId);
+        if (filters.componentId) {
+            conditions.push(`pc.component_id = $${paramIndex++}`);
+            values.push(filters.componentId);
         }
         if (filters.testComponentId) {
             conditions.push(`ter.test_component_id = $${paramIndex++}`);
@@ -89,9 +91,11 @@ export class TestExecutionResultRepository implements ITestExecutionResultReposi
             SELECT
                 ter.id, ter.test_plan_id, ter.plan_component_id, ter.test_component_id,
                 ter.status, ter.message, ter.executed_at,
+                tp.name as test_plan_name,
                 pc.component_name,
                 m.test_component_name
             FROM test_execution_results ter
+            INNER JOIN test_plans tp ON ter.test_plan_id = tp.id
             INNER JOIN plan_components pc ON ter.plan_component_id = pc.id
             LEFT JOIN mappings m ON pc.component_id = m.main_component_id AND ter.test_component_id = m.test_component_id
             WHERE ${whereClause}

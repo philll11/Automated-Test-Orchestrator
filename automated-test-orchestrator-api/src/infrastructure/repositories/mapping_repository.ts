@@ -2,7 +2,7 @@
 
 import type { Pool } from 'pg';
 import { injectable, inject } from 'inversify';
-import { IMappingRepository, UpdateMappingData } from "../../ports/i_mapping_repository.js";
+import { IMappingRepository, UpdateMappingData, AvailableTestInfo } from "../../ports/i_mapping_repository.js";
 import { Mapping } from "../../domain/mapping.js";
 import { rowToMapping } from "../mappers.js";
 import { TYPES } from '../../inversify.types.js';
@@ -40,14 +40,19 @@ export class MappingRepository implements IMappingRepository {
         return result.rows.map(rowToMapping);
     }
 
-    async findAllTestsForMainComponents(mainComponentIds: string[]): Promise<Map<string, string[]>> {
-        const map = new Map<string, string[]>();
+    async findAllTestsForMainComponents(mainComponentIds: string[]): Promise<Map<string, AvailableTestInfo[]>> {
+        const map = new Map<string, AvailableTestInfo[]>();
         if (mainComponentIds.length === 0) return map;
-        const query = 'SELECT main_component_id, test_component_id FROM mappings WHERE main_component_id = ANY($1::varchar[]);';
+        const query = 'SELECT main_component_id, test_component_id, test_component_name FROM mappings WHERE main_component_id = ANY($1::varchar[]);';
         const result = await this.pool.query(query, [mainComponentIds]);
         for (const row of result.rows) {
-            if (!map.has(row.main_component_id)) map.set(row.main_component_id, []);
-            map.get(row.main_component_id)!.push(row.test_component_id);
+            if (!map.has(row.main_component_id)) {
+                map.set(row.main_component_id, []);
+            }
+            map.get(row.main_component_id)!.push({
+                id: row.test_component_id,
+                name: row.test_component_name,
+            });
         }
         return map;
     }

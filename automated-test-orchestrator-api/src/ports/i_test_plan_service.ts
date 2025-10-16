@@ -3,9 +3,10 @@
 import { TestPlan } from "../domain/test_plan.js";
 import { PlanComponent } from '../domain/plan_component.js';
 import { TestExecutionResult } from "../domain/test_execution_result.js";
+import { AvailableTestInfo } from "./i_mapping_repository.js";
 
 export type PlanComponentDetails = PlanComponent & {
-  availableTests: string[];
+  availableTests: AvailableTestInfo[];
   executionResults: TestExecutionResult[];
 };
 

@@ -1,9 +1,14 @@
-// src/ports/mapping_repository.ts
+// src/ports/i_mapping_repository.ts
 
 import { Mapping } from "../domain/mapping.js";
 
 export type NewMapping = Omit<Mapping, 'id' | 'createdAt' | 'updatedAt'>;
 export type UpdateMappingData = Partial<Omit<Mapping, 'id' | 'mainComponentId' | 'createdAt' | 'updatedAt'>>;
+
+export interface AvailableTestInfo {
+    id: string;
+    name?: string;
+}
 
 export interface IMappingRepository {
   /**
@@ -31,11 +36,11 @@ export interface IMappingRepository {
   findAll(): Promise<Mapping[]>;
 
   /**
-   * For a given list of main component IDs, finds all associated test component IDs.
+   * For a given list of main component IDs, finds all associated test component IDs and their names.
    * @param mainComponentIds An array of main component IDs.
-   * @returns A Map where the key is the mainComponentId and the value is an ARRAY of testComponentIds.
+   * @returns A Map where the key is the mainComponentId and the value is an ARRAY of AvailableTestInfo objects.
    */
-  findAllTestsForMainComponents(mainComponentIds: string[]): Promise<Map<string, string[]>>;
+  findAllTestsForMainComponents(mainComponentIds: string[]): Promise<Map<string, AvailableTestInfo[]>>;
 
   /**
    * Updates an existing component-test mapping record, identified by its unique ID.

@@ -35,10 +35,10 @@ import { TYPES } from '../inversify.types.js';
  *         status:
  *           type: string
  *           enum: [SUCCESS, FAILURE]
- *         log:
+ *         message:
  *           type: string
  *           nullable: true
- *           description: The execution log, often containing error details for failures.
+ *           description: The execution message, often containing error details for failures.
  *         executedAt:
  *           type: string
  *           format: date-time
@@ -74,11 +74,10 @@ export class TestExecutionResultsController {
      *           format: uuid
      *         description: Filter results by a specific Test Plan ID.
      *       - in: query
-     *         name: planComponentId
+     *         name: componentId
      *         schema:
      *           type: string
-     *           format: uuid
-     *         description: Filter results by a specific Plan Component ID.
+     *         description: Filter results by a specific main Component ID (the business key).
      *       - in: query
      *         name: testComponentId
      *         schema:
@@ -100,15 +99,15 @@ export class TestExecutionResultsController {
      */
     async getResults(req: Request, res: Response, next: NextFunction): Promise<void> {
         try {
-            const { testPlanId, planComponentId, testComponentId, status } = req.query;
+            const { testPlanId, componentId, testComponentId, status } = req.query;
 
             const filters: TestExecutionResultFilters = {};
 
             if (testPlanId && typeof testPlanId === 'string') {
                 filters.testPlanId = testPlanId;
             }
-            if (planComponentId && typeof planComponentId === 'string') {
-                filters.planComponentId = planComponentId;
+            if (componentId && typeof componentId === 'string') {
+                filters.componentId = componentId;
             }
             if (testComponentId && typeof testComponentId === 'string') {
                 filters.testComponentId = testComponentId;
@@ -118,7 +117,10 @@ export class TestExecutionResultsController {
             }
 
             const results = await this.resultService.getResults(filters);
-            res.status(200).json(results);
+            res.status(200).json({
+                metadata: { code: 200, message: 'OK' },
+                data: results
+            });
         } catch (error) {
             next(error);
         }

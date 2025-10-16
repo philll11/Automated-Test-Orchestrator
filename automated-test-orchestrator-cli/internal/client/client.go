@@ -449,8 +449,8 @@ func (c *APIClient) GetExecutionResults(filters model.GetResultsFilters) ([]mode
 	if filters.TestPlanID != "" {
 		q.Add("testPlanId", filters.TestPlanID)
 	}
-	if filters.DiscoveredComponentID != "" {
-		q.Add("discoveredComponentId", filters.DiscoveredComponentID)
+	if filters.ComponentID != "" {
+		q.Add("componentId", filters.ComponentID)
 	}
 	if filters.TestComponentID != "" {
 		q.Add("testComponentId", filters.TestComponentID)
@@ -470,10 +470,13 @@ func (c *APIClient) GetExecutionResults(filters model.GetResultsFilters) ([]mode
 		return nil, handleRequestError(resp)
 	}
 
-	var results []model.CliEnrichedTestExecutionResult
-	if err := json.NewDecoder(resp.Body).Decode(&results); err != nil {
+	var apiResponse struct {
+		Data []model.CliEnrichedTestExecutionResult `json:"data"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&apiResponse); err != nil {
 		return nil, fmt.Errorf("failed to decode successful API response: %w", err)
 	}
 
-	return results, nil
+	return apiResponse.Data, nil
 }
