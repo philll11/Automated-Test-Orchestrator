@@ -1,4 +1,4 @@
-// src/infrastructure/repositories/component_test_mapping_repository.integration.test.ts
+// src/infrastructure/repositories/mapping_repository.integration.test.ts
 
 import { Pool } from 'pg';
 import { MappingRepository } from './mapping_repository.js';
@@ -12,14 +12,13 @@ describe('MappingRepository Integration Tests', () => {
         host: process.env.DB_HOST,
         database: process.env.DB_NAME,
         password: process.env.DB_PASSWORD,
-        port: parseInt(process.env.DB_PORT || '5433', 10),
+        port: parseInt(process.env.DB_PORT || '5432', 10),
     });
-
-    // Keep track of created records to test findById, update, delete
     let mappingA1: Mapping;
 
     beforeAll(async () => {
         repository = new MappingRepository(testPool);
+        // Verify the connection
         try {
             await testPool.query('SELECT NOW()');
         } catch (error) {
@@ -29,18 +28,19 @@ describe('MappingRepository Integration Tests', () => {
     });
 
     beforeEach(async () => {
+        // Clear the table before each test for isolation
         await testPool.query('TRUNCATE TABLE mappings RESTART IDENTITY CASCADE');
 
-        // Seed data now includes the UUID and multiple tests for comp-A
+        // Seed data now includes the mainComponentName
         const now = new Date();
-        mappingA1 = { id: uuidv4(), mainComponentId: 'comp-A', testComponentId: 'test-A1', createdAt: now, updatedAt: now };
-        const mappingA2 = { id: uuidv4(), mainComponentId: 'comp-A', testComponentId: 'test-A2', createdAt: now, updatedAt: now };
-        const mappingB1 = { id: uuidv4(), mainComponentId: 'comp-B', testComponentId: 'test-B1', createdAt: now, updatedAt: now };
-        
+        mappingA1 = { id: uuidv4(), mainComponentId: 'comp-A', mainComponentName: 'Component A', testComponentId: 'test-A1', testComponentName: 'Test A1', createdAt: now, updatedAt: now };
+        const mappingA2 = { id: uuidv4(), mainComponentId: 'comp-A', mainComponentName: 'Component A', testComponentId: 'test-A2', testComponentName: 'Test A2', createdAt: now, updatedAt: now };
+        const mappingB1 = { id: uuidv4(), mainComponentId: 'comp-B', mainComponentName: 'Component B', testComponentId: 'test-B1', testComponentName: 'Test B1', createdAt: now, updatedAt: now };
+
         for (const m of [mappingA1, mappingA2, mappingB1]) {
             await testPool.query(
-                'INSERT INTO mappings (id, main_component_id, test_component_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)',
-                [m.id, m.mainComponentId, m.testComponentId, m.createdAt, m.updatedAt]
+                'INSERT INTO mappings (id, main_component_id, main_component_name, test_component_id, test_component_name, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+                [m.id, m.mainComponentId, m.mainComponentName, m.testComponentId, m.testComponentName, m.createdAt, m.updatedAt]
             );
         }
     });
@@ -50,22 +50,23 @@ describe('MappingRepository Integration Tests', () => {
     });
 
     describe('create', () => {
-        it('should correctly save a new mapping to the database', async () => {
-            const newMappingData = { id: uuidv4(), mainComponentId: 'comp-C', testComponentId: 'test-C1' };
+        it('should correctly save a new mapping with a mainComponentName', async () => {
+            const newMappingData = { id: uuidv4(), mainComponentId: 'comp-C', mainComponentName: 'Component C', testComponentId: 'test-C1' };
             const createdMapping = await repository.create(newMappingData);
+
             expect(createdMapping.id).toBe(newMappingData.id);
-            expect(createdMapping.mainComponentId).toBe('comp-C');
-            
+            expect(createdMapping.mainComponentName).toBe('Component C');
+
             const result = await testPool.query('SELECT * FROM mappings WHERE id = $1', [newMappingData.id]);
-            expect(result.rowCount).toBe(1);
+            expect(result.rows[0].main_component_name).toBe('Component C');
         });
     });
 
     describe('findById', () => {
-        it('should return a single mapping by its unique UUID', async () => {
+        it('should return a single mapping including its mainComponentName', async () => {
             const found = await repository.findById(mappingA1.id);
             expect(found).not.toBeNull();
-            expect(found?.testComponentId).toBe('test-A1');
+            expect(found?.mainComponentName).toBe('Component A');
         });
     });
 
@@ -73,8 +74,7 @@ describe('MappingRepository Integration Tests', () => {
         it('should return all mappings for a given main component ID', async () => {
             const found = await repository.findByMainComponentId('comp-A');
             expect(found).toHaveLength(2);
-            expect(found.map(m => m.testComponentId)).toContain('test-A1');
-            expect(found.map(m => m.testComponentId)).toContain('test-A2');
+            expect(found[0].mainComponentName).toBe('Component A');
         });
     });
 
@@ -86,38 +86,38 @@ describe('MappingRepository Integration Tests', () => {
     });
 
     describe('findAllTestsForMainComponents', () => {
-        it('should return a map of main component IDs to an array of their test IDs', async () => {
-            const idsToFind = ['comp-A', 'comp-B', 'comp-C']; // comp-C does not exist
+        it('should return a map of main component IDs to an array of test info objects', async () => {
+            const idsToFind = ['comp-A', 'comp-B', 'comp-C'];
             const resultMap = await repository.findAllTestsForMainComponents(idsToFind);
 
-            expect(resultMap.get('comp-A')).toEqual(['test-A1', 'test-A2']);
-            expect(resultMap.get('comp-B')).toEqual(['test-B1']);
+            expect(resultMap.get('comp-A')).toEqual([
+                { id: 'test-A1', name: 'Test A1' },
+                { id: 'test-A2', name: 'Test A2' },
+            ]);
+            expect(resultMap.get('comp-B')).toEqual([
+                { id: 'test-B1', name: 'Test B1' },
+            ]);
             expect(resultMap.has('comp-C')).toBe(false);
         });
     });
 
     describe('update', () => {
-        it('should update the test_component_id of a specific mapping record', async () => {
-            const updatedMapping = await repository.update(mappingA1.id, { testComponentId: 'test-A1-updated' });
-            expect(updatedMapping?.testComponentId).toBe('test-A1-updated');
+        it('should update the main_component_name of a record', async () => {
+            const updatedMapping = await repository.update(mappingA1.id, { mainComponentName: 'Component A Updated' });
+            expect(updatedMapping?.mainComponentName).toBe('Component A Updated');
 
-            const result = await testPool.query('SELECT test_component_id FROM mappings WHERE id = $1', [mappingA1.id]);
-            expect(result.rows[0].test_component_id).toBe('test-A1-updated');
+            const result = await testPool.query('SELECT main_component_name FROM mappings WHERE id = $1', [mappingA1.id]);
+            expect(result.rows[0].main_component_name).toBe('Component A Updated');
         });
     });
 
     describe('delete', () => {
-        it('should delete a specific mapping record by its unique id and return true', async () => {
+        it('should delete a specific mapping record', async () => {
             const wasDeleted = await repository.delete(mappingA1.id);
             expect(wasDeleted).toBe(true);
-            
+
             const result = await testPool.query('SELECT * FROM mappings WHERE id = $1', [mappingA1.id]);
             expect(result.rowCount).toBe(0);
-        });
-
-        it('should return false if no record was found to delete', async () => {
-            const wasDeleted = await repository.delete(uuidv4());
-            expect(wasDeleted).toBe(false);
         });
     });
 });

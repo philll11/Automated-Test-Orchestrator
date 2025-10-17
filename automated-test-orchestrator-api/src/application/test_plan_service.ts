@@ -2,7 +2,9 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { injectable, inject } from 'inversify';
+import pLimit from 'p-limit';
 import { TYPES } from '../inversify.types.js';
+import { IPlatformConfig } from '../infrastructure/config.js';
 import { ITestPlanService, TestPlanWithDetails } from "../ports/i_test_plan_service.js";
 import { TestPlan } from "../domain/test_plan.js";
 import { ITestPlanRepository } from "../ports/i_test_plan_repository.js";
@@ -18,6 +20,7 @@ import { NotFoundError } from '../utils/app_error.js';
 
 @injectable()
 export class TestPlanService implements ITestPlanService {
+    private readonly config: IPlatformConfig;
     private readonly testPlanRepository: ITestPlanRepository;
     private readonly testPlanEntryPointRepository: ITestPlanEntryPointRepository;
     private readonly planComponentRepository: IPlanComponentRepository;
@@ -26,6 +29,7 @@ export class TestPlanService implements ITestPlanService {
     private readonly platformServiceFactory: IIntegrationPlatformServiceFactory;
 
     constructor(
+        @inject(TYPES.IPlatformConfig) config: IPlatformConfig,
         @inject(TYPES.ITestPlanRepository) testPlanRepository: ITestPlanRepository,
         @inject(TYPES.ITestPlanEntryPointRepository) testPlanEntryPointRepository: ITestPlanEntryPointRepository,
         @inject(TYPES.IPlanComponentRepository) planComponentRepository: IPlanComponentRepository,
@@ -33,6 +37,7 @@ export class TestPlanService implements ITestPlanService {
         @inject(TYPES.ITestExecutionResultRepository) testExecutionResultRepository: ITestExecutionResultRepository,
         @inject(TYPES.IIntegrationPlatformServiceFactory) platformServiceFactory: IIntegrationPlatformServiceFactory
     ) {
+        this.config = config;
         this.testPlanRepository = testPlanRepository;
         this.testPlanEntryPointRepository = testPlanEntryPointRepository;
         this.planComponentRepository = planComponentRepository;
@@ -159,6 +164,8 @@ export class TestPlanService implements ITestPlanService {
         await this.testPlanRepository.update({ ...testPlan, status: 'EXECUTING' });
 
         try {
+            const limit = pLimit(this.config.concurrencyLimit);
+
             const integrationPlatformService = await this.platformServiceFactory.create(credentialProfile);
             const planComponents = await this.planComponentRepository.findByTestPlanId(planId);
             const allAvailableTestsMap = await this.mappingRepository.findAllTestsForMainComponents(planComponents.map(c => c.componentId));
@@ -181,20 +188,22 @@ export class TestPlanService implements ITestPlanService {
             }
 
             const executionPromises = finalTestsToExecute.map(async (testId) => {
-                const planComponent = testToPlanComponentMap.get(testId);
-                if (!planComponent) {
-                    console.warn(`Test ID '${testId}' was requested but no corresponding component was found in this plan. Skipping.`);
-                    return;
-                }
-                const result = await integrationPlatformService.executeTestProcess(testId);
-                const newResult: NewTestExecutionResult = {
-                    testPlanId: planId,
-                    planComponentId: planComponent.id,
-                    testComponentId: testId,
-                    status: result.status,
-                    message: result.message,
-                };
-                await this.testExecutionResultRepository.save(newResult);
+                return limit(async () => {
+                    const planComponent = testToPlanComponentMap.get(testId);
+                    if (!planComponent) {
+                        console.warn(`Test ID '${testId}' was requested but no corresponding component was found in this plan. Skipping.`);
+                        return;
+                    }
+                    const result = await integrationPlatformService.executeTestProcess(testId);
+                    const newResult: NewTestExecutionResult = {
+                        testPlanId: planId,
+                        planComponentId: planComponent.id,
+                        testComponentId: testId,
+                        status: result.status,
+                        message: result.message,
+                    };
+                    await this.testExecutionResultRepository.save(newResult);
+                });
             });
 
             await Promise.allSettled(executionPromises);

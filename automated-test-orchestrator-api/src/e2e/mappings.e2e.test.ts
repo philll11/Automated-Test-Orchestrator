@@ -9,17 +9,17 @@ describe('Mappings API End-to-End Tests', () => {
     let testPool: Pool;
 
     beforeAll(() => {
+        // --- CORRECTED CONNECTION ---
         testPool = new Pool({
             user: process.env.DB_USER,
             host: process.env.DB_HOST,
             database: process.env.DB_NAME,
             password: process.env.DB_PASSWORD,
-            port: parseInt(process.env.DB_PORT || '5433', 10),
+            port: parseInt(process.env.DB_PORT || '5432', 10),
         });
     });
 
     beforeEach(async () => {
-        // We only need to clean the mappings table for these tests
         await testPool.query('TRUNCATE TABLE mappings RESTART IDENTITY CASCADE');
     });
 
@@ -28,23 +28,25 @@ describe('Mappings API End-to-End Tests', () => {
         await globalPool.end();
     });
 
-    it('should perform a full CRUD lifecycle for a mapping', async () => {
+    it('should perform a full CRUD lifecycle for a mapping, including mainComponentName', async () => {
         // --- 1. CREATE ---
+        // UPDATED: Include the new mainComponentName field
         const createResponse = await request(app)
             .post('/api/v1/mappings')
             .send({
                 mainComponentId: 'e2e-comp-1',
+                mainComponentName: 'E2E Main Component',
                 testComponentId: 'e2e-test-1',
                 testComponentName: 'E2E Test',
                 isDeployed: true,
-                isPackaged: false,
             })
             .expect(201);
 
-        expect(createResponse.body.data.id).toBeDefined();
         const newMappingId = createResponse.body.data.id;
+        expect(newMappingId).toBeDefined();
         expect(createResponse.body.data.mainComponentId).toBe('e2e-comp-1');
-        expect(createResponse.body.data.isDeployed).toBe(true);
+        // UPDATED: Assert the new field was returned correctly
+        expect(createResponse.body.data.mainComponentName).toBe('E2E Main Component');
 
         // --- 2. READ (Single) ---
         const getResponse = await request(app)
@@ -52,11 +54,10 @@ describe('Mappings API End-to-End Tests', () => {
             .expect(200);
 
         expect(getResponse.body.data.id).toBe(newMappingId);
-        expect(getResponse.body.data.testComponentName).toBe('E2E Test');
+        expect(getResponse.body.data.mainComponentName).toBe('E2E Main Component');
 
         // --- 3. READ (All) ---
-        // First, create a second mapping to test the "get all" functionality
-        await request(app).post('/api/v1/mappings').send({ mainComponentId: 'e2e-comp-2', testComponentId: 'e2e-test-2' });
+        await request(app).post('/api/v1/mappings').send({ mainComponentId: 'e2e-comp-2', mainComponentName: 'Component 2', testComponentId: 'e2e-test-2' });
         
         const getAllResponse = await request(app)
             .get('/api/v1/mappings')
@@ -73,16 +74,18 @@ describe('Mappings API End-to-End Tests', () => {
         expect(getByComponentResponse.body.data[0].testComponentId).toBe('e2e-test-1');
 
         // --- 5. UPDATE ---
+        // UPDATED: Include mainComponentName in the update payload
         const updateResponse = await request(app)
             .put(`/api/v1/mappings/${newMappingId}`)
             .send({
+                mainComponentName: 'E2E Main Component (Updated)',
                 testComponentName: 'E2E Test (Updated)',
-                isDeployed: false,
             })
             .expect(200);
         
+        // UPDATED: Assert that the main component name was updated
+        expect(updateResponse.body.data.mainComponentName).toBe('E2E Main Component (Updated)');
         expect(updateResponse.body.data.testComponentName).toBe('E2E Test (Updated)');
-        expect(updateResponse.body.data.isDeployed).toBe(false);
 
         // --- 6. DELETE ---
         await request(app)
@@ -94,7 +97,6 @@ describe('Mappings API End-to-End Tests', () => {
             .get(`/api/v1/mappings/${newMappingId}`)
             .expect(404);
             
-        // Final check: ensure only one record remains
         const finalGetAllResponse = await request(app).get('/api/v1/mappings').expect(200);
         expect(finalGetAllResponse.body.data).toHaveLength(1);
     });

@@ -1,13 +1,13 @@
 // src/e2e/test_execution_results.e2e.test.ts
 
 import request from 'supertest';
-import pg from 'pg';
+import { Pool } from 'pg';
 import { v4 as uuidv4 } from 'uuid';
 import app from '../app.js';
 import globalPool from '../infrastructure/database.js';
 
 describe('GET /api/v1/test-execution-results End-to-End Test', () => {
-    let testPool: pg.Pool;
+    let testPool: Pool;
 
     // Define IDs for seeding the database
     const plan1Id = uuidv4();
@@ -18,7 +18,7 @@ describe('GET /api/v1/test-execution-results End-to-End Test', () => {
     const pc3Id = uuidv4(); // planComponent 3, belongs to plan2
 
     beforeAll(async () => {
-        testPool = new pg.Pool({
+        testPool = new Pool({
             user: process.env.DB_USER, host: process.env.DB_HOST, database: process.env.DB_NAME,
             password: process.env.DB_PASSWORD, port: parseInt(process.env.DB_PORT || '5433', 10),
         });
