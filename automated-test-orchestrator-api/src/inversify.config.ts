@@ -40,10 +40,14 @@ import { MappingRepository } from './infrastructure/repositories/mapping_reposit
 import { TestExecutionResultRepository } from './infrastructure/repositories/test_execution_result_repository.js';
 import { IntegrationPlatformServiceFactory } from './infrastructure/integration_platform_service_factory.js';
 import { InMemorySecureCredentialService } from './infrastructure/in_memory_secure_credential_service.js';
+import { IPlatformConfig, PlatformConfig } from './infrastructure/config.js';
 
 
 // Create the Inversify container
 const container = new Container();
+
+// --- Configuration Binding ---
+container.bind<IPlatformConfig>(TYPES.IPlatformConfig).to(PlatformConfig).inSingletonScope();
 
 // --- Database Pool Binding ---
 container.bind<Pool>(TYPES.PostgresPool).toConstantValue(globalPool);

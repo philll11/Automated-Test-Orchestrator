@@ -28,4 +28,5 @@ export const TYPES = {
     // Infrastructure
     PostgresPool: Symbol.for('PostgresPool'),
     IIntegrationPlatformServiceFactory: Symbol.for('IIntegrationPlatformServiceFactory'),
+    IPlatformConfig: Symbol.for('IPlatformConfig'),
 };

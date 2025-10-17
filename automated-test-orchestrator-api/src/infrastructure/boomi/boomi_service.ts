@@ -51,8 +51,8 @@ export class BoomiService implements IIntegrationPlatformService {
             }
         });
         this.executionInstanceId = credentials.executionInstanceId;
-        this.pollInterval = options.pollInterval ?? 1000; // 1 second
-        this.maxPolls = options.maxPolls ?? 60;
+        this.pollInterval = options.pollInterval ?? 2000; // 2 seconds
+        this.maxPolls = options.maxPolls ?? 180;
         this.maxRetries = options.maxRetries ?? 5;
         this.initialDelay = options.initialDelay ?? 1000; // 1 second
     }
