@@ -10,7 +10,7 @@ import { TYPES } from '../../inversify.types.js';
 
 @injectable()
 export class TestExecutionResultRepository implements ITestExecutionResultRepository {
-    constructor(@inject(TYPES.PostgresPool) private pool: Pool) {}
+    constructor(@inject(TYPES.PostgresPool) private pool: Pool) { }
 
     async save(newResult: NewTestExecutionResult): Promise<TestExecutionResult> {
         const { testPlanId, planComponentId, testComponentId, status, message } = newResult;
@@ -31,9 +31,9 @@ export class TestExecutionResultRepository implements ITestExecutionResultReposi
             RETURNING *;
         `;
         const values = [result.id, result.testPlanId, result.planComponentId, result.testComponentId, result.status, result.message, result.executedAt];
-        
+
         const dbResult = await this.pool.query(query, values);
-        
+
         return rowToTestExecutionResult(dbResult.rows[0]);
     }
 
@@ -41,7 +41,7 @@ export class TestExecutionResultRepository implements ITestExecutionResultReposi
         if (planComponentIds.length === 0) {
             return [];
         }
-        
+
         const query = `
             SELECT
                 ter.id, ter.test_plan_id, ter.plan_component_id, ter.test_component_id,
@@ -101,8 +101,13 @@ export class TestExecutionResultRepository implements ITestExecutionResultReposi
             WHERE ${whereClause}
             ORDER BY ter.executed_at ASC;
         `;
-        
+
         const result = await this.pool.query(query, values);
         return result.rows.map(rowToTestExecutionResult);
+    }
+
+    async deleteByTestPlanId(testPlanId: string): Promise<void> {
+        const query = 'DELETE FROM test_execution_results WHERE test_plan_id = $1;';
+        await this.pool.query(query, [testPlanId]);
     }
 }

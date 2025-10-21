@@ -6,7 +6,6 @@ import pLimit from 'p-limit';
 import { TYPES } from '../inversify.types.js';
 import { IPlatformConfig } from '../infrastructure/config.js';
 import { ITestPlanService, TestPlanWithDetails } from "../ports/i_test_plan_service.js";
-import { TestPlan } from "../domain/test_plan.js";
 import { ITestPlanRepository } from "../ports/i_test_plan_repository.js";
 import { ComponentInfo, IIntegrationPlatformService } from "../ports/i_integration_platform_service.js";
 import { PlanComponent } from "../domain/plan_component.js";
@@ -17,6 +16,7 @@ import { IIntegrationPlatformServiceFactory } from '../ports/i_integration_platf
 import { TestPlanEntryPoint } from '../domain/test_plan_entry_point.js';
 import { ITestPlanEntryPointRepository } from '../ports/i_test_plan_entry_point_repository.js';
 import { NotFoundError } from '../utils/app_error.js';
+import { TestPlan, TestPlanStatus } from '../domain/test_plan.js';
 
 @injectable()
 export class TestPlanService implements ITestPlanService {
@@ -50,7 +50,7 @@ export class TestPlanService implements ITestPlanService {
         const testPlan: TestPlan = {
             id: uuidv4(),
             name: name,
-            status: 'DISCOVERING',
+            status: TestPlanStatus.DISCOVERING,
             createdAt: new Date(),
             updatedAt: new Date(),
         };
@@ -69,7 +69,7 @@ export class TestPlanService implements ITestPlanService {
                 console.error(`[TestPlanService] Processing failed for plan ${savedTestPlan.id}: ${error.message}`);
                 await this.testPlanRepository.update({
                     ...savedTestPlan,
-                    status: 'DISCOVERY_FAILED',
+                    status: TestPlanStatus.DISCOVERY_FAILED,
                     failureReason: error.message,
                     updatedAt: new Date(),
                 });
@@ -108,7 +108,7 @@ export class TestPlanService implements ITestPlanService {
         if (testPlan) {
             await this.testPlanRepository.update({
                 ...testPlan,
-                status: 'AWAITING_SELECTION',
+                status: TestPlanStatus.AWAITING_SELECTION,
                 updatedAt: new Date(),
             });
         }
@@ -159,9 +159,22 @@ export class TestPlanService implements ITestPlanService {
     public async executeTests(planId: string, testsToRun: string[] | undefined, credentialProfile: string): Promise<void> {
         const testPlan = await this.testPlanRepository.findById(planId);
         if (!testPlan) throw new Error(`TestPlan with id ${planId} not found.`);
-        if (testPlan.status !== 'AWAITING_SELECTION') throw new Error(`TestPlan not in AWAITING_SELECTION state.`);
 
-        await this.testPlanRepository.update({ ...testPlan, status: 'EXECUTING' });
+        const allowedExecutionStates: TestPlanStatus[] = [
+            TestPlanStatus.AWAITING_SELECTION, 
+            TestPlanStatus.COMPLETED, 
+            TestPlanStatus.EXECUTION_FAILED,
+            TestPlanStatus.DISCOVERY_FAILED
+        ];
+        if (!allowedExecutionStates.includes(testPlan.status)) {
+            throw new Error(`TestPlan cannot be executed. Its status is '${testPlan.status}', but it must be one of: ${allowedExecutionStates.join(', ')}.`);
+        }
+
+        // Clear previous execution results
+        await this.testExecutionResultRepository.deleteByTestPlanId(planId);
+
+        await this.testPlanRepository.update({ ...testPlan, status: TestPlanStatus.EXECUTING, failureReason: undefined });
+
 
         try {
             const limit = pLimit(this.config.concurrencyLimit);
@@ -207,12 +220,12 @@ export class TestPlanService implements ITestPlanService {
             });
 
             await Promise.allSettled(executionPromises);
-            await this.testPlanRepository.update({ ...testPlan, status: 'COMPLETED', updatedAt: new Date() });
+            await this.testPlanRepository.update({ ...testPlan, status: TestPlanStatus.COMPLETED, updatedAt: new Date() });
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
             await this.testPlanRepository.update({
                 ...testPlan,
-                status: 'EXECUTION_FAILED',
+                status: TestPlanStatus.EXECUTION_FAILED,
                 failureReason: errorMessage,
                 updatedAt: new Date(),
             });

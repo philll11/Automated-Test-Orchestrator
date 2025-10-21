@@ -9,7 +9,7 @@ import { TYPES } from '../../inversify.types.js';
 
 @injectable()
 export class MappingRepository implements IMappingRepository {
-    constructor(@inject(TYPES.PostgresPool) private pool: Pool) {}
+    constructor(@inject(TYPES.PostgresPool) private pool: Pool) { }
 
     async create(mapping: Omit<Mapping, 'createdAt' | 'updatedAt'>): Promise<Mapping> {
         const { id, mainComponentId, mainComponentName, testComponentId, testComponentName, isDeployed, isPackaged } = mapping;
@@ -33,7 +33,13 @@ export class MappingRepository implements IMappingRepository {
         const result = await this.pool.query(query, [mainComponentId]);
         return result.rows.map(rowToMapping);
     }
-    
+
+    async findByComponentIds(mainComponentId: string, testComponentId: string): Promise<Mapping | null> {
+        const query = 'SELECT * FROM mappings WHERE main_component_id = $1 AND test_component_id = $2;';
+        const result = await this.pool.query(query, [mainComponentId, testComponentId]);
+        return result.rows.length > 0 ? rowToMapping(result.rows[0]) : null;
+    }
+
     async findAll(): Promise<Mapping[]> {
         const query = 'SELECT * FROM mappings ORDER BY main_component_id ASC, created_at ASC;';
         const result = await this.pool.query(query);
@@ -56,13 +62,13 @@ export class MappingRepository implements IMappingRepository {
         }
         return map;
     }
-    
+
     async update(id: string, updates: UpdateMappingData): Promise<Mapping | null> {
         const existingMapping = await this.findById(id);
         if (!existingMapping) return null;
 
         const newValues = { ...existingMapping, ...updates, updatedAt: new Date() };
-        
+
         const query = `
             UPDATE mappings
             SET main_component_name = $1, test_component_id = $2, test_component_name = $3, is_deployed = $4, is_packaged = $5, updated_at = $6
