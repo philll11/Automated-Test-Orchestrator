@@ -31,7 +31,7 @@ func init() {
 	rootCmd.Version = "1.0.0"
 
 	// Define a persistent flag available to all subcommands.
-	rootCmd.PersistentFlags().String("api-url", "http://localhost:3000/api/v1", "The base URL for the Orchestrator API")
+	rootCmd.PersistentFlags().String("api-url", "http://localhost:3001/api/v1", "The base URL for the Orchestrator API")
 
 	// Bind the flag to Viper so its value can be overridden by environment variables or config files.
 	viper.BindPFlag("api_url", rootCmd.PersistentFlags().Lookup("api-url"))
