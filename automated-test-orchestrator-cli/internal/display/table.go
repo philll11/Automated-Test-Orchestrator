@@ -147,7 +147,7 @@ func PrintTestPlanDetails(plan *model.CliTestPlan) {
 	if len(allResults) > 0 {
 		fmt.Println("\n--- Test Execution Results ---")
 		resultsTable := tablewriter.NewWriter(os.Stdout)
-		resultsTable.SetHeader([]string{"Component Name", "Test Name", "Test ID", "Status", "Has Message"})
+		resultsTable.SetHeader([]string{"Component Name", "Test Name", "Status", "Details"})
 
 		// Create a map to get component names easily
 		componentMap := make(map[string]string)
@@ -167,17 +167,48 @@ func PrintTestPlanDetails(plan *model.CliTestPlan) {
 			testName := "N/A"
 			if res.TestComponentName != nil {
 				testName = *res.TestComponentName
-			}
-			status := color.RedString("FAILURE")
-			if res.Status == "SUCCESS" {
-				status = color.GreenString("SUCCESS")
-			}
-			hasMessage := "No"
-			if res.Message != nil && *res.Message != "" {
-				hasMessage = "Yes"
+			} else {
+				testName = res.TestComponentID
 			}
 
-			resultsTable.Append([]string{componentMap[res.ID], testName, res.TestComponentID, status, hasMessage})
+			// Logic for Granular Status Display
+			var statusDisplay string
+			if len(res.TestCases) > 0 {
+				passCount := 0
+				for _, tc := range res.TestCases {
+					if tc.Status == "PASSED" {
+						passCount++
+					}
+				}
+				total := len(res.TestCases)
+				if passCount == total {
+					statusDisplay = fmt.Sprintf("%s\n%s",
+						color.GreenString("SUCCESS"),
+						color.GreenString("(%d/%d)", passCount, total))
+				} else {
+					statusDisplay = fmt.Sprintf("%s\n%s",
+						color.RedString("FAILURE"),
+						color.RedString("(%d/%d)", passCount, total))
+				}
+			} else {
+				// Legacy / System Error
+				if res.Status == "SUCCESS" {
+					statusDisplay = color.GreenString("SUCCESS")
+				} else {
+					statusDisplay = color.RedString("FAILURE")
+				}
+			}
+
+			// Details Column Logic
+			hasMessage := "No"
+			if res.Message != nil && *res.Message != "" {
+				hasMessage = "Msg: Yes"
+			}
+			if len(res.TestCases) > 0 {
+				hasMessage = fmt.Sprintf("Cases: %d", len(res.TestCases))
+			}
+
+			resultsTable.Append([]string{componentMap[res.ID], testName, statusDisplay, hasMessage})
 		}
 		resultsTable.Render()
 	} else {
@@ -239,7 +270,7 @@ func PrintDiscoveryResult(plan *model.CliTestPlan) {
 // PrintExecutionResults renders a list of enriched test execution results in a table.
 func PrintExecutionResults(results []model.CliEnrichedTestExecutionResult) {
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Test Plan", "Component Name", "Test Name", "Status", "Executed At", "Message"})
+	table.SetHeader([]string{"Test Plan", "Component Name", "Test Name", "Status", "Executed At", "Details"})
 	table.SetBorder(true)
 	table.SetRowLine(true)
 
@@ -259,22 +290,47 @@ func PrintExecutionResults(results []model.CliEnrichedTestExecutionResult) {
 			testPlanDisplay = fmt.Sprintf("%s\n(%s)", *r.TestPlanName, r.TestPlanID)
 		}
 
-		status := color.RedString("FAILURE")
-		if r.Status == "SUCCESS" {
-			status = color.GreenString("SUCCESS")
+		// Logic for Granular Status Display
+		var statusDisplay string
+		if len(r.TestCases) > 0 {
+			passCount := 0
+			for _, tc := range r.TestCases {
+				if tc.Status == "PASSED" {
+					passCount++
+				}
+			}
+			total := len(r.TestCases)
+			if passCount == total {
+				statusDisplay = fmt.Sprintf("%s\n%s",
+					color.GreenString("SUCCESS"),
+					color.GreenString("(%d/%d)", passCount, total))
+			} else {
+				statusDisplay = fmt.Sprintf("%s\n%s",
+					color.RedString("FAILURE"),
+					color.RedString("(%d/%d)", passCount, total))
+			}
+		} else {
+			if r.Status == "SUCCESS" {
+				statusDisplay = color.GreenString("SUCCESS")
+			} else {
+				statusDisplay = color.RedString("FAILURE")
+			}
 		}
 
-		hasMessage := "No"
+		hasMessage := "No Msg"
 		if r.Message != nil && *r.Message != "" {
-			hasMessage = "Yes"
+			hasMessage = "Msg: Yes"
+		}
+		if len(r.TestCases) > 0 {
+			hasMessage = fmt.Sprintf("Cases: %d", len(r.TestCases))
 		}
 
 		row := []string{
 			testPlanDisplay,
 			componentName,
 			testName,
-			status,
-			r.ExecutedAt.Local().Format("2006-01-02 15:04:05"),
+			statusDisplay,
+			r.ExecutedAt.Local().Format("2006-01-02\n15:04:05"),
 			hasMessage,
 		}
 		table.Append(row)

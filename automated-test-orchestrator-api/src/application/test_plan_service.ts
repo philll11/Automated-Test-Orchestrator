@@ -214,6 +214,7 @@ export class TestPlanService implements ITestPlanService {
                         testComponentId: testId,
                         status: result.status,
                         message: result.message,
+                        testCases: result.testCases
                     };
                     await this.testExecutionResultRepository.save(newResult);
                 });

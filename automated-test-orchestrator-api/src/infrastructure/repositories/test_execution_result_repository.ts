@@ -13,7 +13,7 @@ export class TestExecutionResultRepository implements ITestExecutionResultReposi
     constructor(@inject(TYPES.PostgresPool) private pool: Pool) { }
 
     async save(newResult: NewTestExecutionResult): Promise<TestExecutionResult> {
-        const { testPlanId, planComponentId, testComponentId, status, message } = newResult;
+        const { testPlanId, planComponentId, testComponentId, status, message, testCases } = newResult;
 
         const result = {
             id: uuidv4(),
@@ -22,16 +22,16 @@ export class TestExecutionResultRepository implements ITestExecutionResultReposi
             testComponentId,
             status,
             message,
+            testCases: testCases || null,
             executedAt: new Date(),
         };
 
         const query = `
-            INSERT INTO test_execution_results (id, test_plan_id, plan_component_id, test_component_id, status, message, executed_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            INSERT INTO test_execution_results (id, test_plan_id, plan_component_id, test_component_id, status, message, test_cases, executed_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *;
         `;
-        const values = [result.id, result.testPlanId, result.planComponentId, result.testComponentId, result.status, result.message, result.executedAt];
-
+        const values = [result.id, result.testPlanId, result.planComponentId, result.testComponentId, result.status, result.message, JSON.stringify(result.testCases), result.executedAt];
         const dbResult = await this.pool.query(query, values);
 
         return rowToTestExecutionResult(dbResult.rows[0]);
@@ -45,7 +45,7 @@ export class TestExecutionResultRepository implements ITestExecutionResultReposi
         const query = `
             SELECT
                 ter.id, ter.test_plan_id, ter.plan_component_id, ter.test_component_id,
-                ter.status, ter.message, ter.executed_at,
+                ter.status, ter.message, ter.executed_at, ter.test_cases,
                 tp.name as test_plan_name,
                 pc.component_name,
                 m.test_component_name
@@ -90,7 +90,7 @@ export class TestExecutionResultRepository implements ITestExecutionResultReposi
         const query = `
             SELECT
                 ter.id, ter.test_plan_id, ter.plan_component_id, ter.test_component_id,
-                ter.status, ter.message, ter.executed_at,
+                ter.status, ter.message, ter.executed_at, ter.test_cases,
                 tp.name as test_plan_name,
                 pc.component_name,
                 m.test_component_name

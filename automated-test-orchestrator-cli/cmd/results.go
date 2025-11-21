@@ -42,7 +42,7 @@ var resultsCmd = &cobra.Command{
 		}
 
 		if verbose {
-			display.PrintVerboseResults(results)
+			display.PrintVerboseResults(results, filters.Status)
 		} else {
 			display.PrintExecutionResults(results)
 		}

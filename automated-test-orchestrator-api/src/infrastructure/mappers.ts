@@ -76,6 +76,7 @@ export function rowToTestExecutionResult(row: any): TestExecutionResult {
     testComponentName: row.test_component_name,
     status: row.status,
     message: row.message,
+    testCases: row.test_cases || undefined, 
     executedAt: row.executed_at,
   };
 }
