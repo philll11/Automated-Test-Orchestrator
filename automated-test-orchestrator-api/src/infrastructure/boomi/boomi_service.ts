@@ -1,7 +1,8 @@
 // src/infrastructure/boomi/boomi_service.ts
 
 import axios, { AxiosInstance } from 'axios';
-import { IIntegrationPlatformService, TestExecutionResult, ComponentInfo } from '../../ports/i_integration_platform_service.js';
+import { IIntegrationPlatformService, PlatformExecutionResult, ComponentInfo } from '../../ports/i_integration_platform_service.js';
+import { TestCaseResult } from '../../domain/test_execution_result.js';
 import { IntegrationPlatformCredentials } from '../../domain/integration_platform_credentials.js';
 import { AuthenticationError, IntegrationPlatformError } from '../../utils/app_error.js';
 
@@ -23,6 +24,15 @@ interface ComponentReferenceResult {
 interface ComponentReferenceQueryResponse {
     numberOfResults: number;
     result?: ComponentReferenceResult[];
+}
+
+interface BoomiTestResultPayload {
+    testCases: {
+        testCaseId: string;
+        testDescription: string;
+        status: string;
+        details: string;
+    }[];
 }
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -175,7 +185,31 @@ export class BoomiService implements IIntegrationPlatformService {
         }
     }
 
-    public async executeTestProcess(componentId: string): Promise<TestExecutionResult> {
+    /**
+     * Helper: Attempts to parse a JSON string extracted from a Boomi error message.
+     * Returns the array of test cases if valid, or null if parsing fails.
+     */
+    private tryParseTestResult(errorMessage: string): TestCaseResult[] | null {
+        try {
+            const parsed = JSON.parse(errorMessage) as BoomiTestResultPayload;
+
+            if (parsed && Array.isArray(parsed.testCases)) {
+                // Map to internal Domain format
+                return parsed.testCases.map(tc => ({
+                    testCaseId: tc.testCaseId,
+                    testDescription: tc.testDescription,
+                    status: (tc.status && tc.status.toUpperCase() === 'PASSED') ? 'PASSED' : 'FAILED',
+                    details: tc.details
+                }));
+            }
+            return null;
+        } catch (e) {
+            // Parsing failed, likely a standard plain-text error message
+            return null;
+        }
+    }
+
+    public async executeTestProcess(componentId: string): Promise<PlatformExecutionResult> {
         try {
 
             const initResponse = await this._requestWithRetry(async () => {
@@ -211,7 +245,25 @@ export class BoomiService implements IIntegrationPlatformService {
                     }
 
                     if (currentStatus === 'ERROR') {
-                        return { status: 'FAILURE', message: `Execution failed with message: ${executionRecord.message}`, executionLogUrl: recordUrl };
+                        const rawMessage = executionRecord.message || '';
+                        
+                        const testCases = this.tryParseTestResult(rawMessage);
+
+                        if (testCases) {
+                             return { 
+                                status: 'FAILURE', 
+                                message: 'Test execution completed with assertion failures.', 
+                                executionLogUrl: recordUrl,
+                                testCases: testCases
+                            };
+                        }
+
+                        // Fallback to generic error
+                        return { 
+                            status: 'FAILURE', 
+                            message: `Execution failed with message: ${rawMessage}`, 
+                            executionLogUrl: recordUrl 
+                        };
                     }
                 }
 

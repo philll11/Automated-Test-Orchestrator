@@ -6,8 +6,8 @@ export type NewMapping = Omit<Mapping, 'id' | 'createdAt' | 'updatedAt'>;
 export type UpdateMappingData = Partial<Omit<Mapping, 'id' | 'mainComponentId' | 'createdAt' | 'updatedAt'>>;
 
 export interface AvailableTestInfo {
-    id: string;
-    name?: string;
+  id: string;
+  name?: string;
 }
 
 export interface IMappingRepository {
@@ -29,7 +29,15 @@ export interface IMappingRepository {
    * @returns An array of all associated mappings.
    */
   findByMainComponentId(mainComponentId: string): Promise<Mapping[]>;
-  
+
+  /**
+   * Finds a unique mapping record by the combination of main component ID and test component ID.
+   * @param mainComponentId The ID of the main component.
+   * @param testComponentId The ID of the test component.
+   * @returns The mapping record if found, otherwise null.
+   */
+  findByComponentIds(mainComponentId: string, testComponentId: string): Promise<Mapping | null>;
+
   /**
    * Retrieves all component-test mappings from the datastore.
    */

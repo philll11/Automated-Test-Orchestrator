@@ -49,7 +49,8 @@ CREATE TABLE mappings (
     is_deployed BOOLEAN DEFAULT FALSE,
     is_packaged BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL,
-    updated_at TIMESTAMP NOT NULL
+    updated_at TIMESTAMP NOT NULL,
+    CONSTRAINT unique_mapping UNIQUE (main_component_id, test_component_id)
 );
 
 -- Table: test_execution_results
@@ -61,6 +62,7 @@ CREATE TABLE test_execution_results (
     test_component_id VARCHAR(255) NOT NULL,
     status VARCHAR(50) NOT NULL,
     message TEXT,
+    test_cases JSONB,
     executed_at TIMESTAMP NOT NULL,
     CONSTRAINT fk_test_plan
         FOREIGN KEY(test_plan_id)

@@ -1,12 +1,13 @@
 // src/domain/test_plan.ts
 
-export type TestPlanStatus =
-  | 'DISCOVERING'
-  | 'AWAITING_SELECTION'
-  | 'EXECUTING'
-  | 'COMPLETED'
-  | 'DISCOVERY_FAILED'
-  | 'EXECUTION_FAILED';
+export enum TestPlanStatus {
+    DISCOVERING = 'DISCOVERING',
+    AWAITING_SELECTION = 'AWAITING_SELECTION',
+    EXECUTING = 'EXECUTING',
+    COMPLETED = 'COMPLETED',
+    DISCOVERY_FAILED = 'DISCOVERY_FAILED',
+    EXECUTION_FAILED = 'EXECUTION_FAILED'
+}
 
 export interface TestPlan {
   id: string;

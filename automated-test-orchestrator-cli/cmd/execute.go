@@ -64,7 +64,7 @@ var executeCmd = &cobra.Command{
 		}
 
 		s.Stop()
-		color.Green("✅ Execution complete!")
+		color.Green("✨ Execution finished.")
 		display.PrintExecutionReport(finalPlan)
 	},
 }

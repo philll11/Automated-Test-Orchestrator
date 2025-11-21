@@ -20,11 +20,9 @@ export default {
     '^.+\\.jsx?$': 'babel-jest',
   },
 
-  // CRITICAL: We override the default ignore pattern.
-  // This tells Jest to NOT ignore the listed ESM modules so Babel can transform them.
-  // It handles both Windows and Unix path separators.
+  // Ignore node_modules except for specific ESM packages
   transformIgnorePatterns: [
-    '<rootDir>/node_modules/(?!.pnpm|uuid|chalk|ora)',
+    '<rootDir>/node_modules/(?!.pnpm|uuid|chalk|ora|p-limit|yocto-queue)',
   ],
 
   // The moduleNameMapper is still needed for resolving ESM imports with extensions

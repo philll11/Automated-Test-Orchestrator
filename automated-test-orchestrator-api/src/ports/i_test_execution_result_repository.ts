@@ -30,4 +30,10 @@ export interface ITestExecutionResultRepository {
    * @param filters An object containing optional filter criteria.
    */
   findByFilters(filters: TestExecutionResultFilters): Promise<TestExecutionResult[]>;
+
+  /**
+   * Deletes all test execution results associated with a specific test plan ID.
+   * @param testPlanId The unique ID of the test plan.
+   */
+  deleteByTestPlanId(testPlanId: string): Promise<void>; 
 }

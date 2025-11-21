@@ -1,14 +1,12 @@
 // src/ports/i_integration_platform_service.ts
 
-export interface IntegrationPlatformCredentials {
-  accountId: string;
-  username: string;
-  passwordOrToken: string;
-}
-export interface TestExecutionResult {
+import { TestCaseResult } from '../domain/test_execution_result.js';
+
+export interface PlatformExecutionResult {
   status: 'SUCCESS' | 'FAILURE';
   message: string;
   executionLogUrl?: string;
+  testCases?: TestCaseResult[];
 }
 
 export interface ComponentInfo {
@@ -35,5 +33,5 @@ export interface IIntegrationPlatformService {
    * Executes a test process and polls for the result.
    * @param componentId The ID of the test process component to execute.
    */
-  executeTestProcess(componentId: string): Promise<TestExecutionResult>;
+  executeTestProcess(componentId: string): Promise<PlatformExecutionResult>;
 }

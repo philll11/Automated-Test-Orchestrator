@@ -6,14 +6,21 @@ import { IMappingService } from '../ports/i_mapping_service.js';
 import { IMappingRepository, NewMapping, UpdateMappingData } from '../ports/i_mapping_repository.js';
 import { Mapping } from '../domain/mapping.js';
 import { TYPES } from '../inversify.types.js';
+import { ConflictError } from '../utils/app_error.js';
 
 @injectable()
 export class MappingService implements IMappingService {
     constructor(
         @inject(TYPES.IMappingRepository) private mappingRepository: IMappingRepository
-    ) {}
+    ) { }
 
     async createMapping(mappingData: NewMapping): Promise<Mapping> {
+        // Check for existing mapping with the same mainComponentId and testComponentId
+        const existingMapping = await this.mappingRepository.findByComponentIds(mappingData.mainComponentId, mappingData.testComponentId);
+        if (existingMapping) {
+            throw new ConflictError(`A mapping with mainComponentId '${mappingData.mainComponentId}' and testComponentId '${mappingData.testComponentId}' already exists.`);
+        }
+
         const mappingWithId: Omit<Mapping, 'createdAt' | 'updatedAt'> = {
             id: uuidv4(),
             ...mappingData
