@@ -1,11 +1,12 @@
-// cli-go/cmd/root.go
+// automated-test-orchestrator-cli/cmd/root.go
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"strings"
 
+	"github.com/automated-test-orchestrator/cli-go/internal/style"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -20,12 +21,15 @@ var rootCmd = &cobra.Command{
 // Execute adds all child commands to the root command and sets flags appropriately.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
+		style.Error("%v", err)
 		os.Exit(1)
 	}
 }
 
 func init() {
+	// Force color output on Windows
+	color.NoColor = false
+
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.Version = "1.0.0"

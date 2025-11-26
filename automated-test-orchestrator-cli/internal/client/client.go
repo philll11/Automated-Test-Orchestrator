@@ -1,4 +1,4 @@
-// cli-go/internal/client/client.go
+// automated-test-orchestrator-cli/internal/client/client.go
 package client
 
 import (

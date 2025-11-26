@@ -1,4 +1,4 @@
-// cli-go/internal/model/api_error.go
+// automated-test-orchestrator-cli/internal/model/api_error.go
 package model
 
 // APIErrorResponse represents the structured error message from the API.

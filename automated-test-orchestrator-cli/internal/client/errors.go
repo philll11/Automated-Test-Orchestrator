@@ -1,4 +1,4 @@
-// cli-go/internal/client/errors.go
+// automated-test-orchestrator-cli/internal/client/errors.go
 package client
 
 import "fmt"

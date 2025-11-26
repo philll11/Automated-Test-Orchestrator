@@ -1,15 +1,13 @@
-// cli-go/cmd/creds.go
+// automated-test-orchestrator-cli/cmd/creds.go
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/automated-test-orchestrator/cli-go/internal/client"
 	"github.com/automated-test-orchestrator/cli-go/internal/display"
 	"github.com/automated-test-orchestrator/cli-go/internal/errors"
 	"github.com/automated-test-orchestrator/cli-go/internal/model"
-	"github.com/fatih/color"
+	"github.com/automated-test-orchestrator/cli-go/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -31,7 +29,7 @@ var credsAddCmd = &cobra.Command{
 		profileName := args[0]
 		apiClient := client.NewAPIClient(viper.GetString("api_url"))
 
-		fmt.Printf("Adding new credentials for profile: %s\n", color.CyanString(profileName))
+		style.Info("Adding new credentials for profile: %s", style.Cyan(profileName))
 
 		answers := struct {
 			AccountID           string `survey:"accountId"`
@@ -44,7 +42,7 @@ var credsAddCmd = &cobra.Command{
 
 		err := survey.Ask(questions, &answers)
 		if err != nil {
-			fmt.Println("\nCredential creation cancelled.")
+			style.Warning("Credential creation cancelled.")
 			return
 		}
 
@@ -60,7 +58,7 @@ var credsAddCmd = &cobra.Command{
 			errors.HandleCLIError(nil, err)
 		}
 
-		color.Green("✅ Profile \"%s\" has been saved securely.", profileName)
+		style.Success("Profile \"%s\" has been saved securely.", profileName)
 	},
 }
 
@@ -77,11 +75,11 @@ var credsListCmd = &cobra.Command{
 		}
 
 		if len(profiles) == 0 {
-			color.Yellow("No credential profiles found. Use \"ato creds add <profile>\" to add one.")
+			style.Warning("No credential profiles found. Use \"ato creds add <profile>\" to add one.")
 			return
 		}
 
-		color.Green("Saved Credential Profiles:")
+		style.Header("Saved Credential Profiles:")
 		display.PrintCredentialProfiles(profiles)
 	},
 }
@@ -100,7 +98,7 @@ var credsRemoveCmd = &cobra.Command{
 			errors.HandleCLIError(nil, err)
 		}
 
-		color.Green("✅ Profile \"%s\" was successfully deleted.", profileName)
+		style.Success("Profile \"%s\" was successfully deleted.", profileName)
 	},
 }
 

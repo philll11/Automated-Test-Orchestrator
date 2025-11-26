@@ -1,4 +1,4 @@
-// cli-go/internal/display/report.go
+// automated-test-orchestrator-cli/internal/display/report.go
 package display
 
 import (
@@ -6,157 +6,53 @@ import (
 	"strings"
 
 	"github.com/automated-test-orchestrator/cli-go/internal/model"
+	"github.com/automated-test-orchestrator/cli-go/internal/style"
 	"github.com/fatih/color"
 )
 
 // PrintExecutionReport renders a Jest-like summary of test execution results.
 func PrintExecutionReport(plan *model.CliTestPlan) {
-	fmt.Println() // Blank line for spacing
+	// Convert CliTestPlan to []CliEnrichedTestExecutionResult to reuse the rendering logic
+	var results []model.CliEnrichedTestExecutionResult
 
-	// --- Metrics Trackers ---
-	var (
-		testsTotal  int
-		testsPassed int
-		testsFailed int
-
-		casesTotal  int
-		casesPassed int
-		casesFailed int
-	)
-
-	// --- PRE-CALCULATE METRICS (Global) ---
-	for _, component := range plan.PlanComponents {
-		if len(component.ExecutionResults) == 0 {
-			continue
-		}
-		for _, result := range component.ExecutionResults {
-			testsTotal++
-			suiteIsFailure := false
-
-			if len(result.TestCases) > 0 {
-				// Granular Mode
-				for _, tc := range result.TestCases {
-					casesTotal++
-					if tc.Status == "FAILED" {
-						casesFailed++
-						suiteIsFailure = true
-					} else {
-						casesPassed++
-					}
-				}
-			} else {
-				// Legacy Mode
-				casesTotal++
-				if result.Status == "FAILURE" {
-					casesFailed++
-					suiteIsFailure = true
-				} else {
-					casesPassed++
-				}
+	for _, comp := range plan.PlanComponents {
+		for _, res := range comp.ExecutionResults {
+			enriched := model.CliEnrichedTestExecutionResult{
+				ID:                res.ID,
+				TestPlanID:        plan.ID,
+				TestPlanName:      &plan.Name,
+				PlanComponentID:   comp.ComponentID,
+				ComponentName:     comp.ComponentName,
+				TestComponentID:   res.TestComponentID,
+				TestComponentName: res.TestComponentName,
+				Status:            res.Status,
+				Message:           res.Message,
+				TestCases:         res.TestCases,
 			}
-
-			if suiteIsFailure {
-				testsFailed++
-			} else {
-				testsPassed++
-			}
+			results = append(results, enriched)
 		}
 	}
 
-	if casesTotal == 0 {
-		color.Yellow("No tests were executed.")
+	if len(results) == 0 {
+		style.Warning("No tests were executed.")
 		return
 	}
 
-	// --- PRINT GLOBAL HEADLINE (The Test Plan) ---
-	if casesFailed > 0 {
-		color.New(color.BgRed, color.FgWhite, color.Bold).Printf(" FAIL ")
-	} else {
-		color.New(color.BgGreen, color.FgBlack, color.Bold).Printf(" PASS ")
-	}
-	// Print Test Plan Name
-	fmt.Printf(" %s\n\n", color.New(color.FgWhite, color.Bold).Sprint(plan.Name))
-
-	// --- RENDER GROUPS (Components) ---
-	for _, component := range plan.PlanComponents {
-		if len(component.ExecutionResults) == 0 {
-			continue
-		}
-
-		// SUBHEADING: The Component
-		componentName := component.ComponentID
-		if component.ComponentName != nil && *component.ComponentName != "" {
-			componentName = *component.ComponentName
-		}
-
-		// Printing: "📦 Component Name"
-		fmt.Printf("%s %s\n", "📦", color.New(color.FgHiCyan, color.Bold).Sprint(componentName))
-
-		// LOOP RESULTS
-		for _, result := range component.ExecutionResults {
-			testName := result.TestComponentID
-			if result.TestComponentName != nil && *result.TestComponentName != "" {
-				testName = *result.TestComponentName
-			}
-
-			// Print Test Component Name
-			fmt.Printf("  %s\n", color.New(color.FgHiWhite).Sprint(testName))
-
-			// === BRANCH A: GRANULAR TEST CASES ===
-			if len(result.TestCases) > 0 {
-				for _, tc := range result.TestCases {
-
-					label := ""
-					idExists := tc.TestCaseID != nil && *tc.TestCaseID != ""
-					descExists := tc.TestDescription != ""
-
-					if idExists && descExists {
-						label = fmt.Sprintf("%s: %s", *tc.TestCaseID, tc.TestDescription)
-					} else if idExists {
-						label = *tc.TestCaseID
-					} else {
-						label = tc.TestDescription
-					}
-
-					if tc.Status == "PASSED" {
-						fmt.Printf("    %s %s\n", "✅", color.New(color.FgHiBlack).Sprint(label))
-					} else {
-						fmt.Printf("    %s %s\n", "❌", color.New(color.FgRed).Sprint(label))
-						if tc.Details != nil && *tc.Details != "" {
-							cleanDetails := strings.TrimSpace(*tc.Details)
-							indented := "      " + strings.ReplaceAll(cleanDetails, "\n", "\n      ")
-							fmt.Println(color.New(color.FgHiBlack).Sprint(indented))
-						}
-					}
-				}
-
-				// === BRANCH B: LEGACY / SYSTEM ===
-			} else {
-				if result.Status == "SUCCESS" {
-					fmt.Printf("    %s %s\n", "✅", color.New(color.FgHiBlack).Sprint("Test completed successfully"))
-				} else {
-					fmt.Printf("    %s %s\n", "❌", color.New(color.FgRed).Sprint("Test Failed"))
-					if result.Message != nil && *result.Message != "" {
-						cleanMessage := strings.TrimSpace(*result.Message)
-						indented := "      " + strings.ReplaceAll(cleanMessage, "\n", "\n      ")
-						fmt.Println(color.New(color.FgHiBlack).Sprint(indented))
-					}
-				}
-			}
-		}
-		fmt.Println() // Spacing between components
-	}
-	printSummaryFooter(testsTotal, testsPassed, testsFailed, casesTotal, casesPassed, casesFailed)
+	renderReport(results, "")
 }
 
 // PrintVerboseResults renders detailed information for query results.
 func PrintVerboseResults(results []model.CliEnrichedTestExecutionResult, statusFilter string) {
 	if len(results) == 0 {
-		color.Yellow("No results found.")
+		style.Warning("No results found.")
 		return
 	}
+	renderReport(results, statusFilter)
+}
 
-	fmt.Println() // Spacing
+// renderReport contains the unified logic for rendering the execution tree.
+func renderReport(results []model.CliEnrichedTestExecutionResult, statusFilter string) {
+	fmt.Fprintln(color.Output) // Spacing
 
 	// --- Data Structures for Grouping ---
 	type CompNode struct {
@@ -266,16 +162,16 @@ func PrintVerboseResults(results []model.CliEnrichedTestExecutionResult, statusF
 		}
 
 		if planHasFailure {
-			color.New(color.BgRed, color.FgWhite, color.Bold).Printf(" FAIL ")
+			fmt.Fprint(color.Output, style.BadgeFail(" FAIL "))
 		} else {
-			color.New(color.BgGreen, color.FgBlack, color.Bold).Printf(" PASS ")
+			fmt.Fprint(color.Output, style.BadgePass(" PASS "))
 		}
-		fmt.Printf(" %s\n\n", color.New(color.FgWhite, color.Bold).Sprint(pNode.Name))
+		fmt.Fprintf(color.Output, " %s\n\n", style.Header(pNode.Name))
 
 		for _, cKey := range pNode.CompOrder {
 			cNode := pNode.Components[cKey]
 
-			fmt.Printf("%s %s\n", "📦", color.New(color.FgHiCyan, color.Bold).Sprint(cNode.Name))
+			fmt.Fprintf(color.Output, "%s %s\n", style.IconBox, style.Cyan(cNode.Name))
 
 			for _, result := range cNode.Results {
 				testName := result.TestComponentID
@@ -283,7 +179,7 @@ func PrintVerboseResults(results []model.CliEnrichedTestExecutionResult, statusF
 					testName = *result.TestComponentName
 				}
 
-				fmt.Printf("  %s\n", color.New(color.FgHiWhite).Sprint(testName))
+				fmt.Fprintf(color.Output, "  %s\n", style.White(testName))
 
 				// === GRANULAR CASES ===
 				if len(result.TestCases) > 0 {
@@ -307,12 +203,12 @@ func PrintVerboseResults(results []model.CliEnrichedTestExecutionResult, statusF
 						}
 
 						if tc.Status == "PASSED" {
-							fmt.Printf("    %s %s\n", "✅", color.New(color.FgHiBlack).Sprint(label))
+							fmt.Fprintf(color.Output, "    %s %s\n", style.IconCheck, style.Faint(label))
 						} else {
-							fmt.Printf("    %s %s\n", "❌", color.New(color.FgRed).Sprint(label))
+							fmt.Fprintf(color.Output, "    %s %s\n", style.IconCross, style.Red(label))
 							if tc.Details != nil && *tc.Details != "" {
 								indented := "      " + strings.ReplaceAll(strings.TrimSpace(*tc.Details), "\n", "\n      ")
-								fmt.Println(color.New(color.FgHiBlack).Sprint(indented))
+								fmt.Fprintln(color.Output, style.Faint(indented))
 							}
 						}
 					}
@@ -321,18 +217,18 @@ func PrintVerboseResults(results []model.CliEnrichedTestExecutionResult, statusF
 					if result.Status == "SUCCESS" {
 						// Only show success if we aren't strictly filtering for failures
 						if statusFilter != "FAILURE" {
-							fmt.Printf("    %s %s\n", "✅", color.New(color.FgHiBlack).Sprint("Test completed successfully"))
+							fmt.Fprintf(color.Output, "    %s %s\n", style.IconCheck, style.Faint("Test completed successfully"))
 						}
 					} else {
-						fmt.Printf("    %s %s\n", "❌", color.New(color.FgRed).Sprint("Test Failed"))
+						fmt.Fprintf(color.Output, "    %s %s\n", style.IconCross, style.Red("Test Failed"))
 						if result.Message != nil && *result.Message != "" {
 							indented := "      " + strings.ReplaceAll(strings.TrimSpace(*result.Message), "\n", "\n      ")
-							fmt.Println(color.New(color.FgHiBlack).Sprint(indented))
+							fmt.Fprintln(color.Output, style.Faint(indented))
 						}
 					}
 				}
 			}
-			fmt.Println()
+			fmt.Fprintln(color.Output)
 		}
 	}
 
@@ -341,29 +237,25 @@ func PrintVerboseResults(results []model.CliEnrichedTestExecutionResult, statusF
 
 // Helper to print the summary footer cleanly
 func printSummaryFooter(sTotal, sPass, sFail, cTotal, cPass, cFail int) {
-	fmt.Println("--- Summary ---")
+	fmt.Fprintln(color.Output, "--- Summary ---")
 
 	// Tests Line
-	fmt.Printf("Tests: ")
+	fmt.Fprint(color.Output, "Tests: ")
 	if sFail > 0 {
-		color.New(color.FgRed, color.Bold).Printf("%d failed", sFail)
-		fmt.Printf(", ")
+		fmt.Fprintf(color.Output, "%s, ", style.Red(fmt.Sprintf("%d failed", sFail)))
 	}
 	if sPass > 0 {
-		color.New(color.FgGreen, color.Bold).Printf("%d passed", sPass)
-		fmt.Printf(", ")
+		fmt.Fprintf(color.Output, "%s, ", style.Green(fmt.Sprintf("%d passed", sPass)))
 	}
-	fmt.Printf("%d total\n", sTotal)
+	fmt.Fprintf(color.Output, "%d total\n", sTotal)
 
 	// Cases Line
-	fmt.Printf("Test Cases:  ")
+	fmt.Fprint(color.Output, "Test Cases:  ")
 	if cFail > 0 {
-		color.New(color.FgRed, color.Bold).Printf("%d failed", cFail)
-		fmt.Printf(", ")
+		fmt.Fprintf(color.Output, "%s, ", style.Red(fmt.Sprintf("%d failed", cFail)))
 	}
 	if cPass > 0 {
-		color.New(color.FgGreen, color.Bold).Printf("%d passed", cPass)
-		fmt.Printf(", ")
+		fmt.Fprintf(color.Output, "%s, ", style.Green(fmt.Sprintf("%d passed", cPass)))
 	}
-	fmt.Printf("%d total\n", cTotal)
+	fmt.Fprintf(color.Output, "%d total\n", cTotal)
 }

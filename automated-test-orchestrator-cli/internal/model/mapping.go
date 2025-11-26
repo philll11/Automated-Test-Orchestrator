@@ -1,4 +1,4 @@
-// cli-go/internal/model/mapping.go
+// automated-test-orchestrator-cli/internal/model/mapping.go
 package model
 
 import "time"

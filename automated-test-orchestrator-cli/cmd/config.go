@@ -1,4 +1,4 @@
-// cli-go/cmd/config.go
+// automated-test-orchestrator-cli/cmd/config.go
 package cmd
 
 import (
@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/fatih/color"
+	"github.com/automated-test-orchestrator/cli-go/internal/style"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -35,7 +35,7 @@ var configSetCmd = &cobra.Command{
 		// Find home directory to determine where to save the file.
 		home, err := os.UserHomeDir()
 		if err != nil {
-			color.Red("Error: Unable to find home directory: %v", err)
+			style.Error("Unable to find home directory: %v", err)
 			os.Exit(1)
 		}
 
@@ -44,11 +44,11 @@ var configSetCmd = &cobra.Command{
 
 		// Use WriteConfigAs to create or overwrite the configuration file.
 		if err := viper.WriteConfigAs(configPath); err != nil {
-			color.Red("Error: Unable to save config file: %v", err)
+			style.Error("Unable to save config file: %v", err)
 			os.Exit(1)
 		}
 
-		color.Green("✅ API URL has been saved to %s", configPath)
+		style.Success("API URL has been saved to %s", configPath)
 	},
 }
 
@@ -61,12 +61,12 @@ var configGetCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		if viper.IsSet(configKeyApiUrl) {
 			value := viper.GetString(configKeyApiUrl)
-			fmt.Printf("Current API URL: %s\n", value)
+			style.PrintKV("Current API URL", value)
 			if viper.ConfigFileUsed() != "" {
-				fmt.Printf(color.HiBlackString(" (from %s)\n", viper.ConfigFileUsed()))
+				fmt.Println(style.Faint(" (from %s)", viper.ConfigFileUsed()))
 			}
 		} else {
-			color.Yellow("API URL is not set. Use 'ato config set <url>' to set it.")
+			style.Warning("API URL is not set. Use 'ato config set <url>' to set it.")
 		}
 	},
 }

@@ -1,4 +1,4 @@
-// cli-go/internal/csv/parser.go
+// automated-test-orchestrator-cli/internal/csv/parser.go
 package csv
 
 import (

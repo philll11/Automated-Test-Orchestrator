@@ -1,4 +1,4 @@
-// cli-go/main.go
+// automated-test-orchestrator-cli/main.go
 package main
 
 import (

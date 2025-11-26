@@ -1,4 +1,4 @@
-// cli-go/internal/model/results.go
+// automated-test-orchestrator-cli/internal/model/results.go
 package model
 
 import "time"

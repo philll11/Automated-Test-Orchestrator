@@ -1,4 +1,4 @@
-// cli-go/internal/model/credentials.go
+// automated-test-orchestrator-cli/internal/model/credentials.go
 package model
 
 // Contains credential information that is safe to display.

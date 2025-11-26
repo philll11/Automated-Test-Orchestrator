@@ -1,4 +1,4 @@
-// cli-go/cmd/mappings.go
+// automated-test-orchestrator-cli/cmd/mappings.go
 package cmd
 
 import (
@@ -11,8 +11,8 @@ import (
 	"github.com/automated-test-orchestrator/cli-go/internal/display"
 	"github.com/automated-test-orchestrator/cli-go/internal/errors"
 	"github.com/automated-test-orchestrator/cli-go/internal/model"
+	"github.com/automated-test-orchestrator/cli-go/internal/style"
 	"github.com/briandowns/spinner"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -35,7 +35,7 @@ var mappingsListCmd = &cobra.Command{
 		}
 
 		if len(mappings) == 0 {
-			color.Yellow("No mappings found.")
+			style.Warning("No mappings found.")
 			return
 		}
 
@@ -75,8 +75,8 @@ var mappingsAddCmd = &cobra.Command{
 		}
 
 		s.Stop()
-		color.Green("✅ Mapping created successfully!")
-		fmt.Printf("Mapping ID: %s\n", color.CyanString(newMapping.ID))
+		style.Success("Mapping created successfully!")
+		style.PrintKV("Mapping ID", style.ID(newMapping.ID))
 	},
 }
 
@@ -105,7 +105,7 @@ var mappingsImportCmd = &cobra.Command{
 
 		if len(mappingsToCreate) == 0 {
 			s.Stop()
-			color.Yellow("No valid mappings found in the CSV file.")
+			style.Warning("No valid mappings found in the CSV file.")
 			return
 		}
 		s.Suffix = fmt.Sprintf(" Found %d mappings to import.", len(mappingsToCreate))
@@ -120,7 +120,7 @@ var mappingsImportCmd = &cobra.Command{
 				s.Stop()
 				// Use the non-terminating formatter for the loop.
 				errorMsg := errors.FormatError(err)
-				fmt.Fprintf(os.Stderr, "\n%s Failed to import row %d: %s\n", color.RedString("✗"), i+2, errorMsg)
+				style.Error("Failed to import row %d: %s", i+2, errorMsg)
 				s.Start() // Restart spinner for the next item
 			} else {
 				successCount++
@@ -128,12 +128,12 @@ var mappingsImportCmd = &cobra.Command{
 		}
 
 		s.Stop()
-		fmt.Println(color.GreenString("\n--- Import Complete ---"))
+		style.Header("\n--- Import Complete ---")
 		if successCount > 0 {
-			color.Green("Successfully imported %d mapping(s).", successCount)
+			style.Success("Successfully imported %d mapping(s).", successCount)
 		}
 		if failureCount > 0 {
-			color.Red("Failed to import %d mapping(s). See error details above.", failureCount)
+			style.Error("Failed to import %d mapping(s). See error details above.", failureCount)
 		}
 	},
 }
@@ -155,7 +155,7 @@ var mappingsRmCmd = &cobra.Command{
 		}
 
 		s.Stop()
-		color.Green("✅ Mapping removed successfully!")
+		style.Success("Mapping removed successfully!")
 	},
 }
 

@@ -39,12 +39,19 @@ export interface ITestPlanService {
   initiateDiscovery(name: string, componentIds: string[], credentialProfile: string, discoverDependencies: boolean): Promise<TestPlan>;
 
   /**
-   * Executes a list of tests for a given plan. If testsToRun is omitted, all tests will be run.
+   * Prepares a test plan for execution by validating its state, clearing previous results,
+   * and setting its status to 'EXECUTING'. This must be awaited before triggering execution.
+   * @param planId The ID of the test plan.
+   */
+  prepareForExecution(planId: string): Promise<void>;
+
+  /**
+   * Runs the actual test execution logic in the background.
    * @param planId The ID of the test plan.
    * @param testsToRun An optional array of test component IDs to execute.
    * @param credentialProfile The name of the credential profile to use for authentication and execution.
    */
-  executeTests(planId: string, testsToRun: string[] | undefined, credentialProfile: string): Promise<void>;
+  runTestExecution(planId: string, testsToRun: string[] | undefined, credentialProfile: string): Promise<void>;
 
   /**
    * Deletes a test plan and all of its associated data.

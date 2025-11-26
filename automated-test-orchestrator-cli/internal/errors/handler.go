@@ -1,4 +1,4 @@
-// cli-go/internal/errors/handler.go
+// automated-test-orchestrator-cli/internal/errors/handler.go
 package errors
 
 import (
@@ -7,8 +7,8 @@ import (
 	"os"
 
 	"github.com/automated-test-orchestrator/cli-go/internal/client"
+	"github.com/automated-test-orchestrator/cli-go/internal/style"
 	"github.com/briandowns/spinner"
-	"github.com/fatih/color"
 )
 
 // FormatError inspects an error and creates a user-friendly, formatted string.
@@ -18,13 +18,13 @@ func FormatError(err error) string {
 
 	if errors.As(err, &apiErr) {
 		// This is a structured error from the API (4xx, 5xx).
-		return fmt.Sprintf("❌ API Error (Status %d): %s", apiErr.StatusCode, apiErr.Message)
+		return fmt.Sprintf("API Error (Status %d): %s", apiErr.StatusCode, apiErr.Message)
 	} else if errors.As(err, &netErr) {
 		// This is a client-side network error.
-		return fmt.Sprintf("❌ %s", netErr.Error())
+		return fmt.Sprintf("%s", netErr.Error())
 	} else {
 		// This is a generic, unexpected error (e.g., file not found).
-		return fmt.Sprintf("❌ An unexpected error occurred: %v", err)
+		return fmt.Sprintf("An unexpected error occurred: %v", err)
 	}
 }
 
@@ -36,6 +36,7 @@ func HandleCLIError(s *spinner.Spinner, err error) {
 	}
 
 	errorMessage := FormatError(err)
-	fmt.Fprintln(os.Stderr, color.RedString("\n%s", errorMessage))
+	fmt.Fprintln(os.Stderr) // Add a newline before the error for better visibility
+	style.Error(errorMessage)
 	os.Exit(1)
 }

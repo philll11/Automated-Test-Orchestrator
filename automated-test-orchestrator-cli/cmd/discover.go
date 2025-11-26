@@ -1,4 +1,4 @@
-// cli-go/cmd/discover.go
+// automated-test-orchestrator-cli/cmd/discover.go
 package cmd
 
 import (
@@ -11,8 +11,8 @@ import (
 	"github.com/automated-test-orchestrator/cli-go/internal/client"
 	"github.com/automated-test-orchestrator/cli-go/internal/csv"
 	"github.com/automated-test-orchestrator/cli-go/internal/display"
+	"github.com/automated-test-orchestrator/cli-go/internal/style"
 	"github.com/briandowns/spinner"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -24,7 +24,7 @@ var discoverCmd = &cobra.Command{
 	Long: `Creates a new test plan. Provide component IDs as arguments, from a CSV file,
 or interactively if no other input is given.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		s := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
+		s := spinner.New(spinner.CharSets[11], 100*time.Millisecond, spinner.WithWriter(os.Stderr))
 		s.Suffix = " Preparing test plan..."
 		s.Start()
 
@@ -37,18 +37,18 @@ or interactively if no other input is given.`,
 		var err error
 
 		if fromCsv != "" {
-			s.Suffix = fmt.Sprintf(" Reading components from %s...", color.CyanString(fromCsv))
+			s.Suffix = fmt.Sprintf(" Reading components from %s...", style.Cyan(fromCsv))
 			file, err := os.Open(fromCsv)
 			if err != nil {
 				s.Stop()
-				color.Red("\nError: Failed to open file: %v", err)
+				style.Error("Failed to open file: %v", err)
 				os.Exit(1)
 			}
 			defer file.Close()
 			componentIds, err = csv.ParseComponentIdCsv(file)
 			if err != nil {
 				s.Stop()
-				color.Red("\nError: Failed to parse CSV file: %v", err)
+				style.Error("Failed to parse CSV file: %v", err)
 				os.Exit(1)
 			}
 		} else if len(args) > 0 {
@@ -57,7 +57,7 @@ or interactively if no other input is given.`,
 			s.Stop() // Stop for interactive prompt
 			componentIds, err = promptForComponentIDs(dependencies)
 			if err != nil {
-				color.Red("Error during interactive prompt: %v", err)
+				style.Error("Error during interactive prompt: %v", err)
 				os.Exit(1)
 			}
 			s.Start()
@@ -65,7 +65,7 @@ or interactively if no other input is given.`,
 
 		if len(componentIds) == 0 {
 			s.Stop()
-			color.Yellow("No component IDs provided. Exiting.")
+			style.Warning("No component IDs provided. Exiting.")
 			return
 		}
 
@@ -79,28 +79,30 @@ or interactively if no other input is given.`,
 		planID, err := apiClient.InitiateDiscovery(name, componentIds, creds, dependencies)
 		if err != nil {
 			s.Stop()
-			color.Red("\nError: Failed to initiate discovery: %v", err)
+			style.Error("Failed to initiate discovery: %v", err)
 			os.Exit(1)
 		}
 
-		s.Suffix = fmt.Sprintf(" Test plan created (ID: %s). Waiting for component discovery...", color.CyanString(planID))
+		s.Suffix = fmt.Sprintf(" Test plan created (ID: %s). Waiting for component discovery...", style.ID(planID))
 		finalPlan, err := apiClient.PollForPlanCompletion(planID)
 		if err != nil {
 			s.Stop()
-			color.Red("\nTest plan creation failed.")
+			style.Error("Test plan creation failed.")
 			if finalPlan != nil && finalPlan.FailureReason != nil {
-				fmt.Printf("Reason: %s\n", *finalPlan.FailureReason)
+				style.Error("Reason: %s", *finalPlan.FailureReason)
 			} else {
-				fmt.Printf("Reason: %v\n", err)
+				style.Error("Reason: %v", err)
 			}
 			os.Exit(1)
 		}
 
 		s.Stop()
-		color.Green("✅ Test plan '%s' processing complete!", finalPlan.Name)
-		fmt.Printf("\nTest Plan ID: %s\n", color.CyanString(planID))
+		style.Success("Test plan '%s' processing complete!", finalPlan.Name)
+		style.PrintKV("Test Plan ID", style.ID(planID))
+		fmt.Println()
 		display.PrintDiscoveryResult(finalPlan)
-		color.Yellow("\nTo execute tests, use the 'execute' command with the Plan ID.")
+		fmt.Println()
+		style.Info("To execute tests, use the 'execute' command with the Plan ID.")
 	},
 }
 

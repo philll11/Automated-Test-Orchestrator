@@ -1,26 +1,21 @@
-// cli-go/internal/display/table.go
+// automated-test-orchestrator-cli/internal/display/table.go
 package display
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/automated-test-orchestrator/cli-go/internal/model"
-	"github.com/fatih/color"
-	"github.com/olekukonko/tablewriter"
+	"github.com/automated-test-orchestrator/cli-go/internal/style"
 )
 
 // PrintCredentialProfiles renders a list of credential profiles in a table.
 func PrintCredentialProfiles(profiles []model.CliCredentialProfile) {
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Profile Name", "Account ID", "Username", "Execution Instance"})
-	table.SetBorder(true)
-	table.SetRowLine(true)
+	table := style.NewTable([]string{"Profile Name", "Account ID", "Username", "Execution Instance"})
 
 	for _, p := range profiles {
 		row := []string{
-			p.ProfileName,
+			style.Cyan(p.ProfileName),
 			p.Credentials.AccountID,
 			p.Credentials.Username,
 			p.Credentials.ExecutionInstanceID,
@@ -33,10 +28,7 @@ func PrintCredentialProfiles(profiles []model.CliCredentialProfile) {
 
 // PrintMappings renders a list of mappings in a table.
 func PrintMappings(mappings []model.CliMapping) {
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Mapping ID", "Main Component ID", "Main Component Name", "Test Component ID", "Test Component Name"})
-	table.SetBorder(true)
-	table.SetRowLine(true)
+	table := style.NewTable([]string{"Mapping ID", "Main Component ID", "Main Component Name", "Test Component ID", "Test Component Name"})
 
 	for _, m := range mappings {
 		mainName := "N/A"
@@ -48,7 +40,7 @@ func PrintMappings(mappings []model.CliMapping) {
 			testName = *m.TestComponentName
 		}
 		row := []string{
-			m.ID,
+			style.ID(m.ID),
 			m.MainComponentID,
 			mainName,
 			m.TestComponentID,
@@ -62,16 +54,23 @@ func PrintMappings(mappings []model.CliMapping) {
 
 // PrintTestPlanSummaries renders a list of test plan summaries in a table.
 func PrintTestPlanSummaries(plans []model.CliTestPlanSummary) {
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Plan ID", "Name", "Status", "Created At"})
-	table.SetBorder(true)
+	table := style.NewTable([]string{"Plan ID", "Name", "Status", "Created At"})
 
 	for _, p := range plans {
+		status := p.Status
+		if strings.Contains(status, "FAILED") {
+			status = style.Red(status)
+		} else if strings.Contains(status, "COMPLETED") {
+			status = style.Green(status)
+		} else {
+			status = style.Yellow(status)
+		}
+
 		row := []string{
-			p.ID,
+			style.ID(p.ID),
 			p.Name,
-			p.Status,
-			p.CreatedAt.Local().Format("2006-01-02 15:04:05"), // Format time for readability
+			status,
+			style.Time(p.CreatedAt.Local()),
 		}
 		table.Append(row)
 	}
@@ -82,29 +81,38 @@ func PrintTestPlanSummaries(plans []model.CliTestPlanSummary) {
 // PrintTestPlanDetails renders the full details of a single test plan across multiple tables.
 func PrintTestPlanDetails(plan *model.CliTestPlan) {
 	// --- Plan Summary Table ---
-	fmt.Println("\n--- Plan Summary ---")
-	summaryTable := tablewriter.NewWriter(os.Stdout)
-	summaryTable.SetHeader([]string{"ID", "Name", "Status", "Created At"})
+	fmt.Println()
+	style.PrintKV("Plan Summary", "")
+	summaryTable := style.NewTable([]string{"ID", "Name", "Status", "Created At"})
+
+	status := plan.Status
+	if strings.Contains(status, "FAILED") {
+		status = style.Red(status)
+	} else if strings.Contains(status, "COMPLETED") {
+		status = style.Green(status)
+	} else {
+		status = style.Yellow(status)
+	}
+
 	summaryTable.Append([]string{
-		plan.ID,
+		style.ID(plan.ID),
 		plan.Name,
-		plan.Status,
-		plan.CreatedAt.Local().Format("2006-01-02 15:04:05"),
+		status,
+		style.Time(plan.CreatedAt.Local()),
 	})
 	summaryTable.Render()
 
 	// --- Failure Reason (if present) ---
 	if strings.HasSuffix(plan.Status, "_FAILED") && plan.FailureReason != nil {
-		color.New(color.FgRed).Printf("\nFailure Reason: ")
-		fmt.Println(*plan.FailureReason)
+		fmt.Println()
+		style.Error("Failure Reason: %s", *plan.FailureReason)
 	}
 
 	// --- Plan Components Table ---
 	if len(plan.PlanComponents) > 0 {
-		fmt.Println("\n--- Plan Components & Test Coverage ---")
-		componentsTable := tablewriter.NewWriter(os.Stdout)
-		componentsTable.SetHeader([]string{"Component ID", "Component Name", "Available Test Name", "Available Test ID"})
-		componentsTable.SetRowLine(true)
+		fmt.Println()
+		style.PrintKV("Plan Components & Test Coverage", "")
+		componentsTable := style.NewTable([]string{"Component ID", "Component Name", "Available Test Name", "Available Test ID"})
 
 		for _, c := range plan.PlanComponents {
 			componentName := "N/A"
@@ -114,8 +122,8 @@ func PrintTestPlanDetails(plan *model.CliTestPlan) {
 
 			var testNamesBuilder, testIDsBuilder strings.Builder
 			if len(c.AvailableTests) == 0 {
-				testNamesBuilder.WriteString("None")
-				testIDsBuilder.WriteString("N/A")
+				testNamesBuilder.WriteString(style.Faint("None"))
+				testIDsBuilder.WriteString(style.Faint("N/A"))
 			} else {
 				for i, test := range c.AvailableTests {
 					testName := "N/A"
@@ -123,7 +131,7 @@ func PrintTestPlanDetails(plan *model.CliTestPlan) {
 						testName = *test.Name
 					}
 					testNamesBuilder.WriteString(testName)
-					testIDsBuilder.WriteString(test.ID)
+					testIDsBuilder.WriteString(style.ID(test.ID))
 
 					if i < len(c.AvailableTests)-1 {
 						testNamesBuilder.WriteString("\n")
@@ -135,7 +143,8 @@ func PrintTestPlanDetails(plan *model.CliTestPlan) {
 		}
 		componentsTable.Render()
 	} else {
-		fmt.Println("\nNo components are associated with this plan.")
+		fmt.Println()
+		style.Info("No components are associated with this plan.")
 	}
 
 	// --- Execution Results Table ---
@@ -145,9 +154,9 @@ func PrintTestPlanDetails(plan *model.CliTestPlan) {
 	}
 
 	if len(allResults) > 0 {
-		fmt.Println("\n--- Test Execution Results ---")
-		resultsTable := tablewriter.NewWriter(os.Stdout)
-		resultsTable.SetHeader([]string{"Component Name", "Test Name", "Status", "Details"})
+		fmt.Println()
+		style.PrintKV("Test Execution Results", "")
+		resultsTable := style.NewTable([]string{"Component Name", "Test Name", "Status", "Details"})
 
 		// Create a map to get component names easily
 		componentMap := make(map[string]string)
@@ -183,19 +192,19 @@ func PrintTestPlanDetails(plan *model.CliTestPlan) {
 				total := len(res.TestCases)
 				if passCount == total {
 					statusDisplay = fmt.Sprintf("%s\n%s",
-						color.GreenString("SUCCESS"),
-						color.GreenString("(%d/%d)", passCount, total))
+						style.Green("SUCCESS"),
+						style.Green(fmt.Sprintf("(%d/%d)", passCount, total)))
 				} else {
 					statusDisplay = fmt.Sprintf("%s\n%s",
-						color.RedString("FAILURE"),
-						color.RedString("(%d/%d)", passCount, total))
+						style.Red("FAILURE"),
+						style.Red(fmt.Sprintf("(%d/%d)", passCount, total)))
 				}
 			} else {
 				// Legacy / System Error
 				if res.Status == "SUCCESS" {
-					statusDisplay = color.GreenString("SUCCESS")
+					statusDisplay = style.Green("SUCCESS")
 				} else {
-					statusDisplay = color.RedString("FAILURE")
+					statusDisplay = style.Red("FAILURE")
 				}
 			}
 
@@ -212,20 +221,19 @@ func PrintTestPlanDetails(plan *model.CliTestPlan) {
 		}
 		resultsTable.Render()
 	} else {
-		fmt.Println("\nNo tests have been executed for this plan yet.")
+		fmt.Println()
+		style.Info("No tests have been executed for this plan yet.")
 	}
 }
 
 // PrintDiscoveryResult renders a detailed table of discovered components and their test coverage.
 func PrintDiscoveryResult(plan *model.CliTestPlan) {
 	if len(plan.PlanComponents) == 0 {
-		color.Yellow("No components were found for this test plan.")
+		style.Warning("No components were found for this test plan.")
 		return
 	}
 
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Component ID", "Component Name", "Has Test Coverage", "Available Test Name", "Available Test ID"})
-	table.SetRowLine(true)
+	table := style.NewTable([]string{"Component ID", "Component Name", "Has Test Coverage", "Available Test Name", "Available Test ID"})
 
 	for _, comp := range plan.PlanComponents {
 		componentName := "N/A"
@@ -237,18 +245,18 @@ func PrintDiscoveryResult(plan *model.CliTestPlan) {
 		var testNamesBuilder, testIDsBuilder strings.Builder
 
 		if len(comp.AvailableTests) == 0 {
-			coverageStatus = color.RedString("❌ No")
-			testNamesBuilder.WriteString("N/A")
-			testIDsBuilder.WriteString("N/A")
+			coverageStatus = style.Red(style.IconCross + " No")
+			testNamesBuilder.WriteString(style.Faint("N/A"))
+			testIDsBuilder.WriteString(style.Faint("N/A"))
 		} else {
-			coverageStatus = color.GreenString("✅ Yes")
+			coverageStatus = style.Green(style.IconCheck + " Yes")
 			for i, test := range comp.AvailableTests {
 				testName := "N/A"
 				if test.Name != nil && *test.Name != "" {
 					testName = *test.Name
 				}
 				testNamesBuilder.WriteString(testName)
-				testIDsBuilder.WriteString(test.ID)
+				testIDsBuilder.WriteString(style.ID(test.ID))
 				if i < len(comp.AvailableTests)-1 {
 					testNamesBuilder.WriteString("\n")
 					testIDsBuilder.WriteString("\n")
@@ -269,10 +277,7 @@ func PrintDiscoveryResult(plan *model.CliTestPlan) {
 
 // PrintExecutionResults renders a list of enriched test execution results in a table.
 func PrintExecutionResults(results []model.CliEnrichedTestExecutionResult) {
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Test Plan", "Component Name", "Test Name", "Status", "Executed At", "Details"})
-	table.SetBorder(true)
-	table.SetRowLine(true)
+	table := style.NewTable([]string{"Test Plan", "Component Name", "Test Name", "Status", "Executed At", "Details"})
 
 	for _, r := range results {
 		componentName := "N/A"
@@ -285,9 +290,9 @@ func PrintExecutionResults(results []model.CliEnrichedTestExecutionResult) {
 		}
 
 		// Format the Test Plan column
-		testPlanDisplay := r.TestPlanID
+		testPlanDisplay := style.ID(r.TestPlanID)
 		if r.TestPlanName != nil && *r.TestPlanName != "" {
-			testPlanDisplay = fmt.Sprintf("%s\n(%s)", *r.TestPlanName, r.TestPlanID)
+			testPlanDisplay = fmt.Sprintf("%s\n(%s)", *r.TestPlanName, style.ID(r.TestPlanID))
 		}
 
 		// Logic for Granular Status Display
@@ -302,18 +307,18 @@ func PrintExecutionResults(results []model.CliEnrichedTestExecutionResult) {
 			total := len(r.TestCases)
 			if passCount == total {
 				statusDisplay = fmt.Sprintf("%s\n%s",
-					color.GreenString("SUCCESS"),
-					color.GreenString("(%d/%d)", passCount, total))
+					style.Green("SUCCESS"),
+					style.Green(fmt.Sprintf("(%d/%d)", passCount, total)))
 			} else {
 				statusDisplay = fmt.Sprintf("%s\n%s",
-					color.RedString("FAILURE"),
-					color.RedString("(%d/%d)", passCount, total))
+					style.Red("FAILURE"),
+					style.Red(fmt.Sprintf("(%d/%d)", passCount, total)))
 			}
 		} else {
 			if r.Status == "SUCCESS" {
-				statusDisplay = color.GreenString("SUCCESS")
+				statusDisplay = style.Green("SUCCESS")
 			} else {
-				statusDisplay = color.RedString("FAILURE")
+				statusDisplay = style.Red("FAILURE")
 			}
 		}
 
@@ -330,7 +335,7 @@ func PrintExecutionResults(results []model.CliEnrichedTestExecutionResult) {
 			componentName,
 			testName,
 			statusDisplay,
-			r.ExecutedAt.Local().Format("2006-01-02\n15:04:05"),
+			style.Time(r.ExecutedAt.Local()),
 			hasMessage,
 		}
 		table.Append(row)

@@ -1,4 +1,4 @@
-// cli-go/cmd/execute.go
+// automated-test-orchestrator-cli/cmd/execute.go
 package cmd
 
 import (
@@ -9,8 +9,8 @@ import (
 
 	"github.com/automated-test-orchestrator/cli-go/internal/client"
 	"github.com/automated-test-orchestrator/cli-go/internal/display"
+	"github.com/automated-test-orchestrator/cli-go/internal/style"
 	"github.com/briandowns/spinner"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -32,7 +32,7 @@ var executeCmd = &cobra.Command{
 			}
 		}
 
-		s := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
+		s := spinner.New(spinner.CharSets[11], 100*time.Millisecond, spinner.WithWriter(os.Stderr))
 		s.Suffix = " Preparing execution..."
 		s.Start()
 
@@ -40,13 +40,13 @@ var executeCmd = &cobra.Command{
 		if len(testsToRun) > 0 {
 			executionMessage = "selected tests"
 		}
-		s.Suffix = fmt.Sprintf(" Initiating execution for %s for Plan ID: %s...", executionMessage, color.CyanString(planID))
+		s.Suffix = fmt.Sprintf(" Initiating execution for %s for Plan ID: %s...", executionMessage, style.ID(planID))
 
 		apiClient := client.NewAPIClient(viper.GetString("api_url"))
 		err := apiClient.InitiateExecution(planID, testsToRun, creds)
 		if err != nil {
 			s.Stop()
-			color.Red("\nError: Failed to initiate execution: %v", err)
+			style.Error("Failed to initiate execution: %v", err)
 			os.Exit(1)
 		}
 
@@ -54,17 +54,17 @@ var executeCmd = &cobra.Command{
 		finalPlan, err := apiClient.PollForExecutionCompletion(planID)
 		if err != nil {
 			s.Stop()
-			color.Red("\nExecution failed.")
+			style.Error("Execution failed.")
 			if finalPlan != nil && finalPlan.FailureReason != nil {
-				fmt.Printf("Reason: %s\n", *finalPlan.FailureReason)
+				style.Error("Reason: %s", *finalPlan.FailureReason)
 			} else {
-				fmt.Printf("Reason: %v\n", err)
+				style.Error("Reason: %v", err)
 			}
 			os.Exit(1)
 		}
 
 		s.Stop()
-		color.Green("✨ Execution finished.")
+		style.Success("Execution finished.")
 		display.PrintExecutionReport(finalPlan)
 	},
 }

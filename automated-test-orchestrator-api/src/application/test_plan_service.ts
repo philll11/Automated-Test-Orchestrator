@@ -156,7 +156,7 @@ export class TestPlanService implements ITestPlanService {
         await this.testPlanRepository.deleteById(planId);
     }
 
-    public async executeTests(planId: string, testsToRun: string[] | undefined, credentialProfile: string): Promise<void> {
+    public async prepareForExecution(planId: string): Promise<void> {
         const testPlan = await this.testPlanRepository.findById(planId);
         if (!testPlan) throw new Error(`TestPlan with id ${planId} not found.`);
 
@@ -173,8 +173,14 @@ export class TestPlanService implements ITestPlanService {
         // Clear previous execution results
         await this.testExecutionResultRepository.deleteByTestPlanId(planId);
 
+        // Set status to EXECUTING immediately
         await this.testPlanRepository.update({ ...testPlan, status: TestPlanStatus.EXECUTING, failureReason: undefined });
+    }
 
+    public async runTestExecution(planId: string, testsToRun: string[] | undefined, credentialProfile: string): Promise<void> {
+        // Fetch plan again to ensure we have the latest state (though we assume it's EXECUTING)
+        const testPlan = await this.testPlanRepository.findById(planId);
+        if (!testPlan) return; // Should not happen if prepareForExecution was called
 
         try {
             const limit = pLimit(this.config.concurrencyLimit);
@@ -193,12 +199,14 @@ export class TestPlanService implements ITestPlanService {
 
             // If no specific tests were requested, run all available tests.
             let finalTestsToExecute: string[];
+            console.log(`[DEBUG] testsToRun received: ${JSON.stringify(testsToRun)}`);
             if (testsToRun && testsToRun.length > 0) {
                 finalTestsToExecute = testsToRun;
             } else {
                 // Flatten the map values and extract just the test IDs for execution
                 finalTestsToExecute = Array.from(allAvailableTestsMap.values()).flat().map(test => test.id);
             }
+            console.log(`[DEBUG] finalTestsToExecute: ${JSON.stringify(finalTestsToExecute)}`);
 
             const executionPromises = finalTestsToExecute.map(async (testId) => {
                 return limit(async () => {
@@ -207,20 +215,29 @@ export class TestPlanService implements ITestPlanService {
                         console.warn(`Test ID '${testId}' was requested but no corresponding component was found in this plan. Skipping.`);
                         return;
                     }
-                    const result = await integrationPlatformService.executeTestProcess(testId);
-                    const newResult: NewTestExecutionResult = {
-                        testPlanId: planId,
-                        planComponentId: planComponent.id,
-                        testComponentId: testId,
-                        status: result.status,
-                        message: result.message,
-                        testCases: result.testCases
-                    };
-                    await this.testExecutionResultRepository.save(newResult);
+                    try {
+                        console.log(`[DEBUG] Executing test ${testId}...`);
+                        const result = await integrationPlatformService.executeTestProcess(testId);
+                        console.log(`[DEBUG] Test ${testId} executed. Status: ${result.status}`);
+                        const newResult: NewTestExecutionResult = {
+                            testPlanId: planId,
+                            planComponentId: planComponent.id,
+                            testComponentId: testId,
+                            status: result.status,
+                            message: result.message,
+                            testCases: result.testCases
+                        };
+                        await this.testExecutionResultRepository.save(newResult);
+                        console.log(`[DEBUG] Result saved for test ${testId}`);
+                    } catch (err) {
+                        console.error(`[DEBUG] Error executing/saving test ${testId}:`, err);
+                        throw err;
+                    }
                 });
             });
 
-            await Promise.allSettled(executionPromises);
+            const results = await Promise.allSettled(executionPromises);
+            console.log(`[DEBUG] All settled results:`, JSON.stringify(results));
             await this.testPlanRepository.update({ ...testPlan, status: TestPlanStatus.COMPLETED, updatedAt: new Date() });
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';

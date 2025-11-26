@@ -291,7 +291,13 @@ export class TestPlanController {
             throw new BadRequestError('If provided, testsToRun must be an array.');
         }
 
-        this.testPlanService.executeTests(planId, testsToRun, credentialProfile).catch(err => {
+        // 1. Synchronously prepare the plan (validate state, clear results, set status to EXECUTING).
+        // We await this to ensure the DB is updated BEFORE we send the response.
+        await this.testPlanService.prepareForExecution(planId);
+
+        // 2. Trigger the background execution (Fire and Forget).
+        // We do NOT await this, so the HTTP response returns immediately.
+        this.testPlanService.runTestExecution(planId, testsToRun, credentialProfile).catch(err => {
             console.error(`[Execution Error] Unhandled rejection for plan ${planId}:`, err);
         });
 
