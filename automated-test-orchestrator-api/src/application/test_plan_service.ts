@@ -178,7 +178,7 @@ export class TestPlanService implements ITestPlanService {
     }
 
     public async runTestExecution(planId: string, testsToRun: string[] | undefined, credentialProfile: string): Promise<void> {
-        // Fetch plan again to ensure we have the latest state (though we assume it's EXECUTING)
+        // Fetch plan again to ensure we have the latest state
         const testPlan = await this.testPlanRepository.findById(planId);
         if (!testPlan) return; // Should not happen if prepareForExecution was called
 
