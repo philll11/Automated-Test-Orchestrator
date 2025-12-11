@@ -28,7 +28,7 @@ func ParseMappingCsv(reader io.Reader) ([]model.CreateMappingRequest, error) {
 	header := records[0]
 	headerMap := make(map[string]int)
 	for i, h := range header {
-		headerMap[strings.TrimSpace(h)] = i
+		headerMap[sanitize(h)] = i
 	}
 
 	// Validate required headers
@@ -103,7 +103,7 @@ func ParseComponentIdCsv(reader io.Reader) ([]string, error) {
 	}
 
 	header := records[0]
-	if len(header) == 0 || strings.TrimSpace(header[0]) != "componentId" {
+	if len(header) == 0 || sanitize(header[0]) != "componentId" {
 		return nil, fmt.Errorf("CSV file is missing required header: componentId")
 	}
 
@@ -118,4 +118,9 @@ func ParseComponentIdCsv(reader io.Reader) ([]string, error) {
 	}
 
 	return componentIds, nil
+}
+
+func sanitize(s string) string {
+	s = strings.TrimSpace(s)               // Remove leading/trailing whitespace
+	return strings.TrimPrefix(s, "\ufeff") // Remove BOM if present
 }
