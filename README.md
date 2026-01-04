@@ -36,7 +36,7 @@ Before you begin, ensure you have the following installed on your machine:
 -   **Git**
 -   **Docker** and **Docker Compose**
 -   **For the API Service:** Node.js (LTS version, e.g., v20.x or higher) & NPM
--   **For the CLI:** Go (e.g., v1.21 or higher)
+-   **For the CLI:** Go (LTS version, e.g., v1.21 or higher)
 
 ## **Getting Started**
 
@@ -103,18 +103,6 @@ ato config set api_url http://localhost:3000/api/v1
 # 2. Verify the setup by listing credential profiles (this will be empty initially)
 ato creds list
 ```
-Your full development environment is now set up!
-
-## **Development Workflow**
-
--   **API Development:** Make changes to the code in the `automated-test-orchestrator-api/src` directory. To see your changes, you must restart the Docker containers by stopping (`Ctrl+C`) and re-running `docker-compose up --build`.
--   **CLI Development:** Make changes to the code in the `automated-test-orchestrator-cli` directory. You can either:
-    -   Run commands directly during development using `go run . <command>`.
-    -   Re-build and re-install the binary using the steps in "Getting Started" to test the final executable.
-
-## **Running Tests**
-
-Tests for each application must be run from within their respective directories.
 
 ### **API Service Tests**
 
@@ -142,17 +130,6 @@ npm run test:integration
 
 # Run all end-to-end tests (requires Docker database to be running)
 npm run test:e2e
-```
-
-### **CLI Tests**
-
-The Go project contains its own set of unit tests.
-
-```sh
-# In the automated-test-orchestrator-cli directory
-
-# Run all tests
-go test ./...
 ```
 
 ## **Project Structure**
