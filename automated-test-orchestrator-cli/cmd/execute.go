@@ -73,7 +73,7 @@ func init() {
 	rootCmd.AddCommand(executeCmd)
 	executeCmd.Flags().StringP("planId", "p", "", "The Test Plan ID from the discovery phase (required)")
 	executeCmd.Flags().StringP("tests", "t", "", "A comma-separated list of specific test component IDs to run")
-	executeCmd.Flags().String("creds", "", "The name of the credential profile to use (required)")
+	executeCmd.Flags().StringP("creds", "c", "", "The name of the credential profile to use (required)")
 
 	executeCmd.MarkFlagRequired("planId")
 	executeCmd.MarkFlagRequired("creds")

@@ -21,7 +21,7 @@ import (
 var discoverCmd = &cobra.Command{
 	Use:   "discover",
 	Short: "Create a new test plan",
-	Long: `Creates a new test plan. Provide component/test IDs via --entry-id, from a CSV file,
+	Long: `Creates a new test plan. Provide component/test IDs via --ids, from a CSV file,
 or interactively if no other input is given.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		s := spinner.New(spinner.CharSets[11], 100*time.Millisecond, spinner.WithWriter(os.Stderr))
@@ -30,7 +30,7 @@ or interactively if no other input is given.`,
 
 		planName, _ := cmd.Flags().GetString("plan-name")
 		planType, _ := cmd.Flags().GetString("type")
-		entryIDs, _ := cmd.Flags().GetStringArray("entry-id")
+		entryIDs, _ := cmd.Flags().GetStringArray("ids")
 		fromCsv, _ := cmd.Flags().GetString("from-csv")
 		dependencies, _ := cmd.Flags().GetBool("dependencies")
 		creds, _ := cmd.Flags().GetString("creds")
@@ -133,12 +133,12 @@ func promptForComponentIDs(dependencies bool) ([]string, error) {
 
 func init() {
 	rootCmd.AddCommand(discoverCmd)
-	discoverCmd.Flags().String("plan-name", "", "A descriptive name for the test plan (required)")
-	discoverCmd.Flags().String("type", "COMPONENT", "Plan Mode: COMPONENT (default) or TEST")
-	discoverCmd.Flags().StringArray("entry-id", []string{}, "ID of component or test to include (can be used multiple times)")
-	discoverCmd.Flags().String("from-csv", "", "Path to a CSV file with a single column of 'componentId's")
-	discoverCmd.Flags().Bool("dependencies", false, "Discover all dependencies for the provided components")
-	discoverCmd.Flags().String("creds", "", "The name of the credential profile to use (required)")
+	discoverCmd.Flags().StringP("plan-name", "p", "", "A descriptive name for the test plan (required)")
+	discoverCmd.Flags().StringP("type", "t", "COMPONENT", "Plan Mode: COMPONENT (default) or TEST")
+	discoverCmd.Flags().StringArrayP("ids", "i", []string{}, "ID of component or test to include, e.g. '32939380-cece-4a24-a255-5a4d358aed4e' (can be used multiple times)")
+	discoverCmd.Flags().StringP("from-csv", "f", "", "Path to a CSV file with a single column of 'componentId's")
+	discoverCmd.Flags().BoolP("dependencies", "d", false, "Discover all dependencies for the provided components")
+	discoverCmd.Flags().StringP("creds", "c", "", "The name of the credential profile to use (required)")
 
 	discoverCmd.MarkFlagRequired("plan-name")
 	discoverCmd.MarkFlagRequired("creds")
