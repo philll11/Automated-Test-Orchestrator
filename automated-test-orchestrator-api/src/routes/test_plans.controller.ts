@@ -114,7 +114,7 @@ export class TestPlanController {
      *   post:
      *     summary: Create a new Test Plan
      *     tags: [Test Plans]
-     *     description: Creates a new test plan from a list of components. The creation process runs asynchronously. Set `discoverDependencies` to true to recursively find all dependencies for the provided components.
+     *     description: Creates a new test plan from a list of components, names, or folders. The creation process runs asynchronously.
      *     requestBody:
      *       required: true
      *       content:
@@ -123,27 +123,34 @@ export class TestPlanController {
      *             type: object
      *             required:
      *               - name
-     *               - componentIds
      *               - credentialProfile
      *             properties:
      *               name:
      *                 type: string
      *                 description: "A descriptive name for the test plan."
      *                 example: "Pre-Release v2.1 Smoke Test"
-     *               componentIds:
+     *               entryPointIds:
      *                 type: array
      *                 items:
      *                   type: string
-     *                 description: "An array of one or more component IDs to include in the plan."
-     *                 example: ["2582515a-40fb-4d5d-bcc9-10817caa4fa2", "a1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6"]
+     *                 description: "An explicit list of component UUIDs."
+     *               entryPointNames:
+     *                 type: array
+     *                 items:
+     *                   type: string
+     *                 description: "A list of human-readable component names to resolve."
+     *               entryPointFolderNames:
+     *                 type: array
+     *                 items:
+     *                   type: string
+     *                 description: "A list of folder names to scan for components."
      *               credentialProfile:
      *                 type: string
      *                 description: "The name of the credential profile to use."
      *                 example: "dev-account"
      *               discoverDependencies:
      *                 type: boolean
-     *                 description: "If true, the system will discover all dependencies for the provided componentIds. Defaults to false."
-     *                 example: false
+     *                 description: "If true, the system will discover all dependencies for the provided components. Defaults to false."
      *     responses:
      *       '202':
      *         description: Accepted. The test plan creation process has been initiated.
@@ -155,20 +162,41 @@ export class TestPlanController {
      *         description: Bad Request. Missing or invalid required fields.
      */
     public async initiateDiscovery(req: Request, res: Response): Promise<void> {
-        let { name, planType, componentIds, credentialProfile, discoverDependencies } = req.body;
+        let { name, planType, compIds, compNames, compFolderNames, entryPointIds, componentIds, credentialProfile, discoverDependencies } = req.body;
 
         if (!planType) {
             planType = TestPlanType.COMPONENT;
         }
 
-        if (!name || typeof name !== 'string' || !credentialProfile || !Array.isArray(componentIds) || componentIds.length === 0) {
-            throw new BadRequestError('A non-empty name, credentialProfile, and a non-empty componentIds array are required');
+        // Backward compatibility
+        if (!compIds) {
+             if (entryPointIds) compIds = entryPointIds;
+             if (componentIds) compIds = componentIds;
         }
+
+        if (!name || typeof name !== 'string' || !credentialProfile) {
+            throw new BadRequestError('A non-empty name and credentialProfile are required');
+        }
+
+        // Validate at least one input source is present
+        const hasIds = Array.isArray(compIds) && compIds.length > 0;
+        const hasNames = Array.isArray(compNames) && compNames.length > 0;
+        const hasFolders = Array.isArray(compFolderNames) && compFolderNames.length > 0;
+
+        if (!hasIds && !hasNames && !hasFolders) {
+            throw new BadRequestError('At least one of compIds, compNames, or compFolderNames must be provided and non-empty.');
+        }
+
+        const inputs = {
+            compIds: hasIds ? compIds : undefined,
+            compNames: hasNames ? compNames : undefined,
+            compFolderNames: hasFolders ? compFolderNames : undefined
+        };
 
         const testPlan = await this.testPlanService.initiateDiscovery(
             name,
             planType as TestPlanType,
-            componentIds,
+            inputs,
             credentialProfile,
             discoverDependencies ?? false // Default to false if undefined
         );

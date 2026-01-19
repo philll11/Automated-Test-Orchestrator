@@ -9,10 +9,20 @@ export interface PlatformExecutionResult {
   testCases?: TestCaseResult[];
 }
 
+export interface ComponentSearchCriteria {
+  ids?: string[];
+  names?: string[];
+  folderNames?: string[];
+  types?: string[];
+  exactNameMatch?: boolean;
+}
+
 export interface ComponentInfo {
   id: string;
   name: string;
   type: string;
+  folderId?: string;
+  folderName?: string;
   dependencyIds: string[];
 }
 
@@ -34,4 +44,10 @@ export interface IIntegrationPlatformService {
    * @param componentId The ID of the test process component to execute.
    */
   executeTestProcess(componentId: string): Promise<PlatformExecutionResult>;
+
+  /**
+   * Searches for components matching the criteria.
+   * Automatically handles pagination to return all matching results.
+   */
+  searchComponents(criteria: ComponentSearchCriteria): Promise<ComponentInfo[]>;
 }

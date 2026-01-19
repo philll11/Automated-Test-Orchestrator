@@ -11,7 +11,14 @@
     "test": "jest --verbose",
     "test:unit": "jest --testMatch=\"<rootDir>/src/**/*.unit.test.ts\" --verbose",
     "test:int": "jest --runInBand --testMatch=\"<rootDir>/src/**/*.integration.test.ts\" --verbose",
-    "test:e2e": "jest --runInBand --testMatch=\"<rootDir>/src/**/*.e2e.test.ts\" --verbose"
+    "test:e2e:creds": "jest --runInBand --testMatch=\"<rootDir>/src/**/credentials.e2e.test.ts\" --verbose",
+    "test:e2e:disc": "jest --runInBand --testMatch=\"<rootDir>/src/**/discovery.e2e.test.ts\" --verbose",
+    "test:e2e:exec": "jest --runInBand --testMatch=\"<rootDir>/src/**/execution.e2e.test.ts\" --verbose",
+    "test:e2e:map": "jest --runInBand --testMatch=\"<rootDir>/src/**/mappings.e2e.test.ts\" --verbose",
+    "test:e2e:result": "jest --runInBand --testMatch=\"<rootDir>/src/**/test_execution_results.e2e.test.ts\" --verbose",
+    "test:e2e:plan": "jest --runInBand --testMatch=\"<rootDir>/src/**/test_plans.e2e.test.ts\" --verbose",
+    "test:e2e:live": "jest --runInBand --testMatch=\"<rootDir>/src/**/live_system.e2e.test.ts\" --verbose",
+    "test:e2e:all": "jest --runInBand --testMatch=\"<rootDir>/src/**/*.e2e.test.ts\" --verbose"
   },
   "dependencies": {
     "@types/express": "4.17.21",

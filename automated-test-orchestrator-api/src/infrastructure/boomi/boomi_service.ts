@@ -1,16 +1,25 @@
 // src/infrastructure/boomi/boomi_service.ts
 
 import axios, { AxiosInstance } from 'axios';
-import { IIntegrationPlatformService, PlatformExecutionResult, ComponentInfo } from '../../ports/i_integration_platform_service.js';
+import { IIntegrationPlatformService, PlatformExecutionResult, ComponentInfo, ComponentSearchCriteria } from '../../ports/i_integration_platform_service.js';
 import { TestCaseResult } from '../../domain/test_execution_result.js';
 import { IntegrationPlatformCredentials } from '../../domain/integration_platform_credentials.js';
 import { AuthenticationError, IntegrationPlatformError } from '../../utils/app_error.js';
 
 // --- Type Definitions for Boomi API Responses ---
 interface ComponentMetadataResponse {
+    componentId?: string; // Present in Query results
     name: string;
     version: number;
     type: string;
+    folderId?: string; // Present in Query results
+    folderName?: string;
+}
+
+interface BoomiQueryResponse<T> {
+    numberOfResults: number;
+    queryToken?: string;
+    result?: T[];
 }
 
 interface ComponentReference {
@@ -92,6 +101,104 @@ export class BoomiService implements IIntegrationPlatformService {
             }
         }
         throw new IntegrationPlatformError('Retry loop completed without success or failure.', undefined, this.maxRetries);
+    }
+
+    private async _queryWithPagination<T>(endpoint: string, initialPayload: any): Promise<T[]> {
+        let allResults: T[] = [];
+        let queryToken: string | undefined = undefined;
+
+        // Initial Query
+        const initialResponse = await this._requestWithRetry(async () => {
+            return await this.apiClient.post<BoomiQueryResponse<T>>(`${endpoint}/query`, initialPayload);
+        });
+
+        if (initialResponse.data.result) {
+            allResults = allResults.concat(initialResponse.data.result);
+        }
+        queryToken = initialResponse.data.queryToken;
+
+        // Paging Loop
+        while (queryToken) {
+            const token = queryToken;
+            const moreResponse = await this._requestWithRetry(async () => {
+                // Boomi queryMore expects the raw token string in the body
+                return await this.apiClient.post<BoomiQueryResponse<T>>(`${endpoint}/queryMore`, token);
+            });
+
+            if (moreResponse.data.result) {
+                allResults = allResults.concat(moreResponse.data.result);
+            }
+            queryToken = moreResponse.data.queryToken;
+        }
+
+        return allResults;
+    }
+
+    public async searchComponents(criteria: ComponentSearchCriteria): Promise<ComponentInfo[]> {
+        const globalFilters: any[] = [];
+
+        // 1. Global Filters (AND)
+        // Always filter for non-deleted and current version to ensure we get valid executable artifacts
+        globalFilters.push({ operator: 'EQUALS', property: 'deleted', argument: ['false'] });
+        globalFilters.push({ operator: 'EQUALS', property: 'currentVersion', argument: ['true'] });
+
+        if (criteria.types && criteria.types.length > 0) {
+            globalFilters.push({ operator: 'EQUALS', property: 'type', argument: criteria.types });
+        }
+
+        // 2. Search Criteria (OR) combined into one block
+        const orCriteria: any[] = [];
+
+        if (criteria.folderNames && criteria.folderNames.length > 0) {
+            orCriteria.push({ operator: 'EQUALS', property: 'folderName', argument: criteria.folderNames });
+        }
+
+        if (criteria.names && criteria.names.length > 0) {
+            const operator = criteria.exactNameMatch === false ? 'LIKE' : 'EQUALS';
+            orCriteria.push({ operator: operator, property: 'name', argument: criteria.names });
+        }
+
+        if (criteria.ids && criteria.ids.length > 0) {
+            // Boomi Constraint: Use OR + nested EQUALS for multiple ID matching to act as IN
+            const idOrFilters = criteria.ids.map(id => ({
+                operator: 'EQUALS',
+                property: 'componentId',
+                argument: [id]
+            }));
+
+            orCriteria.push({
+                operator: 'or',
+                nestedExpression: idOrFilters
+            });
+        }
+
+        // Only add the OR block if we have criteria
+        if (orCriteria.length > 0) {
+            globalFilters.push({
+                operator: 'or',
+                nestedExpression: orCriteria
+            });
+        }
+
+        const payload = {
+            QueryFilter: {
+                expression: {
+                    operator: 'and',
+                    nestedExpression: globalFilters
+                }
+            }
+        };
+
+        const results = await this._queryWithPagination<ComponentMetadataResponse>('/ComponentMetadata', payload);
+
+        return results.map(r => ({
+            id: r.componentId!,
+            name: r.name,
+            type: r.type,
+            folderId: r.folderId,
+            folderName: r.folderName,
+            dependencyIds: []
+        }));
     }
 
     private async getComponentMetadata(componentId: string): Promise<ComponentMetadataResponse | null> {

@@ -318,11 +318,13 @@ var ErrPlanDiscoveryFailed = errors.New("test plan discovery failed on the serve
 var ErrPlanExecutionFailed = errors.New("test plan execution failed on the server")
 
 // InitiateDiscovery creates a new test plan on the backend.
-func (c *APIClient) InitiateDiscovery(name string, planType string, componentIds []string, profile string, dependencies bool) (string, error) {
+func (c *APIClient) InitiateDiscovery(name string, planType string, compIDs []string, compNames []string, compFolderNames []string, profile string, dependencies bool) (string, error) {
 	payload := model.InitiateDiscoveryRequest{
 		Name:                 name,
 		PlanType:             planType,
-		ComponentIDs:         componentIds,
+		CompIDs:              compIDs,
+		CompNames:            compNames,
+		CompFolderNames:      compFolderNames,
 		CredentialProfile:    profile,
 		DiscoverDependencies: dependencies,
 	}

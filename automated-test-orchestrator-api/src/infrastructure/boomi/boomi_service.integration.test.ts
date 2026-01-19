@@ -2,6 +2,7 @@ import nock from 'nock';
 import { BoomiService } from './boomi_service.js';
 import { IntegrationPlatformCredentials } from '../../domain/integration_platform_credentials.js';
 import { IPlatformConfig } from '../config.js'; // Import the config interface
+import { ComponentSearchCriteria } from '../../ports/i_integration_platform_service.js';
 
 // --- MOCK CREDENTIALS ---
 const testCredentials: IntegrationPlatformCredentials = {
@@ -179,6 +180,91 @@ describe('BoomiService', () => {
             expect(result.status).toBe('FAILURE');
             expect(result.message).toBe('Execution timed out while polling for a result.');
             expect(nock.isDone()).toBe(true);
+        });
+    });
+
+    describe('searchComponents', () => {
+        it('should consolidate ID, Name, and Folder searches into appropriate queries', async () => {
+             // Setup Criteria
+             const criteria: ComponentSearchCriteria = {
+                 ids: ['proc-123', 'proc-456'],
+                 names: ['My Process'],
+                 folderNames: ['My Folder'],
+                 types: ['process']
+             };
+
+             // Expect Single ComponentMetadata Query
+             nock(BOOMI_API_BASE)
+                 .post(`${baseApiUrl}/ComponentMetadata/query`, (body) => {
+                     // This is the complex validation
+                     const mainAnd = body.QueryFilter.expression;
+                     if (mainAnd.operator !== 'and') return false;
+                     
+                     const filters = mainAnd.nestedExpression;
+                     // Should have deleted=false, currentVersion=true, type=process, OR-block
+                     const deleted = filters.find((f: any) => f.property === 'deleted');
+                     const current = filters.find((f: any) => f.property === 'currentVersion');
+                     const type = filters.find((f: any) => f.property === 'type');
+                     const orBlock = filters.find((f: any) => f.operator === 'or');
+
+                     if (!deleted || !current || !type || !orBlock) return false;
+
+                     // Check OR block contents
+                     const orExprs = orBlock.nestedExpression;
+                     // Should contain:
+                     // 1. folderName EQUALS ['My Folder']
+                     // 2. name EQUALS ['My Process']
+                     // 3. nested OR request for IDs
+                     
+                     const folderCheck = orExprs.find((f: any) => f.property === 'folderName' && f.argument[0] === 'My Folder');
+                     const nameCheck = orExprs.find((f: any) => f.property === 'name' && f.argument[0] === 'My Process');
+                     const idCheck = orExprs.find((f: any) => f.operator === 'or' && f.nestedExpression.length === 2); // 2 IDs
+
+                     return !!folderCheck && !!nameCheck && !!idCheck;
+                 })
+                 .reply(200, {
+                     numberOfResults: 1,
+                     result: [
+                         { componentId: 'proc-123', name: 'My Process', type: 'process', folderId: 'folder-abc', folderName: 'My Folder' }
+                     ]
+                 });
+
+            const service = new BoomiService(testCredentials);
+            const results = await service.searchComponents(criteria);
+
+            expect(results).toHaveLength(1);
+            expect(results[0].id).toBe('proc-123');
+            expect(nock.isDone()).toBe(true);
+        });
+
+        it('should handle pagination when search returns more results than one page', async () => {
+             // Simple criteria
+             const criteria: ComponentSearchCriteria = { names: ['Common'] };
+
+             // Mock First Page (returns token)
+             nock(BOOMI_API_BASE)
+                .post(`${baseApiUrl}/ComponentMetadata/query`)
+                .reply(200, {
+                    numberOfResults: 2,
+                    queryToken: 'token-abc',
+                    result: [{ componentId: '1', name: 'Common A', version: 1, type: 'process' }]
+                });
+
+             // Mock Second Page (uses token, no token in response)
+             // Note: Boomi API client sends token as JSON string, so body is "token-abc"
+             nock(BOOMI_API_BASE)
+                .post(`${baseApiUrl}/ComponentMetadata/queryMore`, JSON.stringify('token-abc'))
+                .reply(200, {
+                    numberOfResults: 1,
+                    result: [{ componentId: '2', name: 'Common B', version: 1, type: 'process' }]
+                });
+
+             const service = new BoomiService(testCredentials);
+             const results = await service.searchComponents(criteria);
+
+             expect(results).toHaveLength(2);
+             expect(results.map(r => r.id).sort()).toEqual(['1', '2']);
+             expect(nock.isDone()).toBe(true);
         });
     });
 });

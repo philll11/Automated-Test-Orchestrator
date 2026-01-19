@@ -15,7 +15,8 @@ The Automated Test Orchestrator is an application designed to improve the reliab
 
 ## **Core Features**
 
--   **Flexible Test Plan Creation:** Create test plans from a list of components via CLI or CSV import.
+-   **Dual-Mode Operation:** Choose between **Component Mode** (for dependency analysis and coverage) or **Test Mode** (for direct execution of specific test processes).
+-   **Flexible Test Plan Creation:** Create test plans from a list of components, human-readable process names, or folder paths via CLI or CSV import.
 -   **Automated Dependency Discovery:** Recursively discover all nested child components to build a complete dependency map.
 -   **Test Coverage Analysis:** Identify all available tests for every component in a plan and highlight coverage gaps.
 -   **Interactive & Full Test Execution:** Execute a specific subset of tests or intelligently run all available tests for a plan.

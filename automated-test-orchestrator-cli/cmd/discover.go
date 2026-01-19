@@ -31,13 +31,18 @@ or interactively if no other input is given.`,
 		planName, _ := cmd.Flags().GetString("plan-name")
 		planType, _ := cmd.Flags().GetString("type")
 		entryIDs, _ := cmd.Flags().GetStringArray("ids")
+		entryNames, _ := cmd.Flags().GetStringArray("names")
+		folderNames, _ := cmd.Flags().GetStringArray("folders")
 		fromCsv, _ := cmd.Flags().GetString("from-csv")
 		dependencies, _ := cmd.Flags().GetBool("dependencies")
 		creds, _ := cmd.Flags().GetString("creds")
 
 		var componentIds []string
+		var componentNames []string
+		var componentFolders []string
 		var err error
 
+		// 1. Load from CSV (currently assumes IDs only)
 		if fromCsv != "" {
 			s.Suffix = fmt.Sprintf(" Reading components from %s...", style.Cyan(fromCsv))
 			file, err := os.Open(fromCsv)
@@ -53,9 +58,21 @@ or interactively if no other input is given.`,
 				style.Error("Failed to parse CSV file: %v", err)
 				os.Exit(1)
 			}
-		} else if len(entryIDs) > 0 {
-			componentIds = entryIDs
-		} else {
+		}
+
+		// 2. Append Flags
+		if len(entryIDs) > 0 {
+			componentIds = append(componentIds, entryIDs...)
+		}
+		if len(entryNames) > 0 {
+			componentNames = append(componentNames, entryNames...)
+		}
+		if len(folderNames) > 0 {
+			componentFolders = append(componentFolders, folderNames...)
+		}
+
+		// 3. Interactive fallback (only if NO inputs provided)
+		if len(componentIds) == 0 && len(componentNames) == 0 && len(componentFolders) == 0 {
 			s.Stop() // Stop for interactive prompt
 			componentIds, err = promptForComponentIDs(dependencies)
 			if err != nil {
@@ -65,9 +82,9 @@ or interactively if no other input is given.`,
 			s.Start()
 		}
 
-		if len(componentIds) == 0 {
+		if len(componentIds) == 0 && len(componentNames) == 0 && len(componentFolders) == 0 {
 			s.Stop()
-			style.Warning("No component IDs provided. Exiting.")
+			style.Warning("No IDs, Names, or Folders provided. Exiting.")
 			return
 		}
 
@@ -75,10 +92,11 @@ or interactively if no other input is given.`,
 		if dependencies {
 			discoveryMode = " and all their dependencies"
 		}
-		s.Suffix = fmt.Sprintf(" Creating test plan '%s' with %d component(s)%s...", planName, len(componentIds), discoveryMode)
+		totalInputs := len(componentIds) + len(componentNames) + len(componentFolders)
+		s.Suffix = fmt.Sprintf(" Creating test plan '%s' with %d input(s)%s...", planName, totalInputs, discoveryMode)
 
 		apiClient := client.NewAPIClient(viper.GetString("api_url"))
-		planID, err := apiClient.InitiateDiscovery(planName, planType, componentIds, creds, dependencies)
+		planID, err := apiClient.InitiateDiscovery(planName, planType, componentIds, componentNames, componentFolders, creds, dependencies)
 		if err != nil {
 			s.Stop()
 			style.Error("Failed to initiate discovery: %v", err)
@@ -136,6 +154,8 @@ func init() {
 	discoverCmd.Flags().StringP("plan-name", "p", "", "A descriptive name for the test plan (required)")
 	discoverCmd.Flags().StringP("type", "t", "COMPONENT", "Plan Mode: COMPONENT (default) or TEST")
 	discoverCmd.Flags().StringArrayP("ids", "i", []string{}, "ID of component or test to include, e.g. '32939380-cece-4a24-a255-5a4d358aed4e' (can be used multiple times)")
+	discoverCmd.Flags().StringArrayP("names", "n", []string{}, "Name of component or test to resolve (can be used multiple times)")
+	discoverCmd.Flags().StringArrayP("folders", "F", []string{}, "Name of folder to scan for components/tests (can be used multiple times)")
 	discoverCmd.Flags().StringP("from-csv", "f", "", "Path to a CSV file with a single column of 'componentId's")
 	discoverCmd.Flags().BoolP("dependencies", "d", false, "Discover all dependencies for the provided components")
 	discoverCmd.Flags().StringP("creds", "c", "", "The name of the credential profile to use (required)")

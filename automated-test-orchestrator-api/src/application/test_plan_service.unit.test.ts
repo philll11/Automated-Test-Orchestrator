@@ -54,6 +54,7 @@ const mockIntegrationService: jest.Mocked<IIntegrationPlatformService> = {
     getComponentInfo: jest.fn(),
     getComponentInfoAndDependencies: jest.fn(),
     executeTestProcess: jest.fn(),
+    searchComponents: jest.fn(),
 };
 
 const mockPlatformServiceFactory: jest.Mocked<IIntegrationPlatformServiceFactory> = {
@@ -146,31 +147,42 @@ describe('TestPlanService', () => {
         const credentialProfile = 'test-profile';
         const componentIds = ['comp-A', 'comp-B'];
 
+        beforeEach(() => {
+            mockPlatformServiceFactory.createService.mockResolvedValue(mockIntegrationService);
+            mockIntegrationService.searchComponents.mockResolvedValue([
+                { id: 'comp-A', name: 'Comp A', type: 'process', dependencyIds: [] },
+                { id: 'comp-B', name: 'Comp B', type: 'process', dependencyIds: [] }
+            ]);
+        });
+
         it('should create a TestPlan with a name and trigger async processing', async () => {
             mockTestPlanRepo.save.mockImplementation(async (plan) => ({ ...plan, id: 'plan-uuid' }));
             const processSpy = jest.spyOn(service as any, 'processPlanComponents').mockResolvedValue(undefined);
 
             // UPDATED: Pass the name parameter
-            const result = await service.initiateDiscovery(planName, TestPlanType.COMPONENT, componentIds, credentialProfile, true);
+            const result = await service.initiateDiscovery(planName, TestPlanType.COMPONENT, { compIds: componentIds }, credentialProfile, true);
 
             expect(result.name).toBe(planName); // ADDED: Check name
             expect(result.status).toBe(TestPlanStatus.DISCOVERING);
             // UPDATED: Check that the name is passed to the save method
             expect(mockTestPlanRepo.save).toHaveBeenCalledWith(expect.objectContaining({ name: planName, planType: TestPlanType.COMPONENT, status: TestPlanStatus.DISCOVERING }));
             expect(mockTestPlanEntryPointRepo.saveAll).toHaveBeenCalled();
-            expect(processSpy).toHaveBeenCalledWith(componentIds, 'plan-uuid', credentialProfile, true);
+            // Checking first arg is array of ComponentInfo, checking by IDs
+            const expectedResolvedComponents = [
+                expect.objectContaining({ id: 'comp-A' }),
+                expect.objectContaining({ id: 'comp-B' })
+            ];
+            expect(processSpy).toHaveBeenCalledWith(expectedResolvedComponents, 'plan-uuid', credentialProfile, true);
         });
 
         it('should handle errors in async processing and update TestPlan status', async () => {
             const apiError = new Error('Integration API failure');
             mockTestPlanRepo.save.mockImplementation(async (plan) => ({ ...plan, id: 'plan-fail' }));
-            // Mock dependency injection of platform service
-            mockPlatformServiceFactory.createService.mockResolvedValue(mockIntegrationService);
-
+            
             // Spy on internal method to simulate async error
             jest.spyOn(service as any, 'processPlanComponents').mockRejectedValue(apiError);
 
-            await service.initiateDiscovery(planName, TestPlanType.COMPONENT, componentIds, credentialProfile, false);
+            await service.initiateDiscovery(planName, TestPlanType.COMPONENT, { compIds: componentIds }, credentialProfile, false);
 
             await allowAsyncOperations(); // Wait for promise chain
 
@@ -180,6 +192,58 @@ describe('TestPlanService', () => {
                 failureReason: 'Integration API failure'
             }));
         });
+
+        it('should correctly map inputs to ComponentSearchCriteria', async () => {
+            const inputs = {
+                compIds: ['id-1'],
+                compNames: ['Process A'],
+                compFolderNames: ['Folder X']
+            };
+            
+            mockTestPlanRepo.save.mockImplementation(async (plan) => ({ ...plan, id: 'plan-criteria-uuid' }));
+            // Mock successful search so we don't fail on validation
+            mockIntegrationService.searchComponents.mockResolvedValue([
+                { id: 'id-1', name: 'Existing Process', type: 'process', dependencyIds: [] },
+                { id: 'id-2', name: 'Process A', type: 'process', dependencyIds: [] }
+            ]);
+
+            await service.initiateDiscovery(planName, TestPlanType.COMPONENT, inputs, credentialProfile, false);
+
+            expect(mockIntegrationService.searchComponents).toHaveBeenCalledWith(expect.objectContaining({
+                ids: ['id-1'],
+                names: ['Process A'],
+                folderNames: ['Folder X'],
+                exactNameMatch: true,
+                types: undefined
+            }));
+        });
+
+        it('should enforce type filtering when in TEST mode', async () => {
+            const inputs = { compNames: ['My Test'] };
+            
+            mockTestPlanRepo.save.mockImplementation(async (plan) => ({ ...plan, id: 'plan-test-criteria' }));
+            mockIntegrationService.searchComponents.mockResolvedValue([
+                { id: 'test-1', name: 'My Test', type: 'process', dependencyIds: [] }
+            ]);
+
+            await service.initiateDiscovery(planName, TestPlanType.TEST, inputs, credentialProfile, false);
+
+            expect(mockIntegrationService.searchComponents).toHaveBeenCalledWith(expect.objectContaining({
+                types: ['process']
+            }));
+        });
+
+        it('should throw an error if a requested Name is not found', async () => {
+            const inputs = { compNames: ['Missing Process', 'Found Process'] };
+            
+            mockIntegrationService.searchComponents.mockResolvedValue([
+                 { id: 'found-1', name: 'Found Process', type: 'process', dependencyIds: [] }
+            ]);
+            
+            await expect(service.initiateDiscovery(planName, TestPlanType.COMPONENT, inputs, credentialProfile, false))
+                .rejects
+                .toThrow(/Could not resolve the following names/);
+        });
     });
 
     describe('initiateDiscovery (TEST Mode)', () => {
@@ -187,13 +251,21 @@ describe('TestPlanService', () => {
         const testIds = ['test-1', 'test-2'];
         const credentialProfile = 'test-profile';
 
+        beforeEach(() => {
+            mockPlatformServiceFactory.createService.mockResolvedValue(mockIntegrationService);
+            mockIntegrationService.searchComponents.mockResolvedValue([
+                { id: 'test-1', name: 'Test 1', type: 'process', dependencyIds: [] },
+                { id: 'test-2', name: 'Test 2', type: 'process', dependencyIds: [] }
+            ]);
+        });
+
         it('should create a TestPlan in TEST mode and trigger processTestModeComponents', async () => {
             mockTestPlanRepo.save.mockImplementation(async (plan) => ({ ...plan, id: 'plan-test-uuid' }));
             // Spy on the test mode processing method
             const processTestSpy = jest.spyOn(service as any, 'processTestModeComponents').mockResolvedValue(undefined);
             const processComponentSpy = jest.spyOn(service as any, 'processPlanComponents');
 
-            await service.initiateDiscovery(planName, TestPlanType.TEST, testIds, credentialProfile, false);
+            await service.initiateDiscovery(planName, TestPlanType.TEST, { compIds: testIds }, credentialProfile, false);
 
             expect(mockTestPlanRepo.save).toHaveBeenCalledWith(expect.objectContaining({
                 name: planName,
@@ -201,7 +273,11 @@ describe('TestPlanService', () => {
             }));
 
             // Should call TEST handler, NOT COMPONENT handler
-            expect(processTestSpy).toHaveBeenCalledWith(testIds, 'plan-test-uuid', credentialProfile);
+            const expectedResolvedComponents = [
+                expect.objectContaining({ id: 'test-1' }),
+                expect.objectContaining({ id: 'test-2' })
+            ];
+            expect(processTestSpy).toHaveBeenCalledWith(expectedResolvedComponents, 'plan-test-uuid', credentialProfile);
             expect(processComponentSpy).not.toHaveBeenCalled();
         });
     });

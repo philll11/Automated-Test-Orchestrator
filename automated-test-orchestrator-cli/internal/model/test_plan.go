@@ -54,7 +54,9 @@ type CliTestPlanSummary struct {
 type InitiateDiscoveryRequest struct {
 	Name                 string   `json:"name"`
 	PlanType             string   `json:"planType"`
-	ComponentIDs         []string `json:"componentIds"`
+	CompIDs              []string `json:"compIds"`
+	CompNames            []string `json:"compNames"`
+	CompFolderNames      []string `json:"compFolderNames"`
 	CredentialProfile    string   `json:"credentialProfile"`
 	DiscoverDependencies bool     `json:"discoverDependencies"`
 }

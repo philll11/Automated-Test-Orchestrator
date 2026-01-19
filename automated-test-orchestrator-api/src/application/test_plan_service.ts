@@ -5,7 +5,7 @@ import { injectable, inject } from 'inversify';
 import pLimit from 'p-limit';
 import { TYPES } from '../inversify.types.js';
 import { IPlatformConfig } from '../infrastructure/config.js';
-import { ITestPlanService, TestPlanWithDetails } from "../ports/i_test_plan_service.js";
+import { ITestPlanService, TestPlanWithDetails, CreateTestPlanInputs } from "../ports/i_test_plan_service.js";
 import { ITestPlanRepository } from "../ports/i_test_plan_repository.js";
 import { ComponentInfo, IIntegrationPlatformService } from "../ports/i_integration_platform_service.js";
 import { PlanComponent } from "../domain/plan_component.js";
@@ -46,7 +46,18 @@ export class TestPlanService implements ITestPlanService {
         this.platformServiceFactory = platformServiceFactory;
     }
 
-    public async initiateDiscovery(name: string, planType: TestPlanType, componentIds: string[], credentialProfile: string, discoverDependencies: boolean): Promise<TestPlan> {
+    public async initiateDiscovery(name: string, planType: TestPlanType, inputs: CreateTestPlanInputs, credentialProfile: string, discoverDependencies: boolean): Promise<TestPlan> {
+        
+        // --- 1. Backend Input Resolution Phase ---
+        // We must resolve names and folders to specific Component IDs before creating the plan.
+        const platformService = await this.platformServiceFactory.createService(credentialProfile);
+        const resolvedComponents = await this.resolveInputs(inputs, planType, platformService);
+
+        if (resolvedComponents.length === 0) {
+            throw new Error('Input resolution failed: No valid components found matching the providing IDs, names, or folders.');
+        }
+
+        // --- 2. Plan Creation ---
         const testPlan: TestPlan = {
             id: uuidv4(),
             name: name,
@@ -58,15 +69,16 @@ export class TestPlanService implements ITestPlanService {
 
         const savedTestPlan = await this.testPlanRepository.save(testPlan);
 
-        const entryPoints: TestPlanEntryPoint[] = componentIds.map(componentId => ({
+        const entryPoints: TestPlanEntryPoint[] = resolvedComponents.map(comp => ({
             id: uuidv4(),
             testPlanId: savedTestPlan.id,
-            componentId,
+            componentId: comp.id,
         }));
         await this.testPlanEntryPointRepository.saveAll(entryPoints);
 
+        // --- 3. Async Processing ---
         if (planType === TestPlanType.TEST) {
-             this.processTestModeComponents(componentIds, savedTestPlan.id, credentialProfile)
+             this.processTestModeComponents(resolvedComponents, savedTestPlan.id, credentialProfile)
                 .catch(async (error: Error) => {
                     console.error(`[TestPlanService] Processing failed for plan ${savedTestPlan.id}: ${error.message}`);
                     await this.testPlanRepository.update({
@@ -77,7 +89,7 @@ export class TestPlanService implements ITestPlanService {
                     });
                 });
         } else {
-             this.processPlanComponents(componentIds, savedTestPlan.id, credentialProfile, discoverDependencies)
+             this.processPlanComponents(resolvedComponents, savedTestPlan.id, credentialProfile, discoverDependencies)
                 .catch(async (error: Error) => {
                     console.error(`[TestPlanService] Processing failed for plan ${savedTestPlan.id}: ${error.message}`);
                     await this.testPlanRepository.update({
@@ -92,25 +104,50 @@ export class TestPlanService implements ITestPlanService {
         return savedTestPlan;
     }
 
-    private async processTestModeComponents(componentIds: string[], planId: string, credentialProfile: string): Promise<void> {
-        const platformService = await this.platformServiceFactory.createService(credentialProfile);
-        const planComponents: PlanComponent[] = [];
-        const limit = pLimit(5);
+    private async resolveInputs(inputs: CreateTestPlanInputs, planType: TestPlanType, platformService: IIntegrationPlatformService): Promise<ComponentInfo[]> {
+        // Context-Aware Filter: If TEST mode, rigorously filter for 'process' type only.
+        const typeFilter = planType === TestPlanType.TEST ? ['process'] : undefined;
 
-        await Promise.all(componentIds.map(id => limit(async () => {
-             const info = await platformService.getComponentInfo(id);
-             if (!info) {
-                 throw new Error(`Component/Test ${id} not found on platform.`);
-             }
-             planComponents.push({
-                 id: uuidv4(),
-                 testPlanId: planId,
-                 sourceType: 'ARG',
-                 componentId: id,
-                 componentName: info.name,
-                 componentType: info.type
-             });
-        })));
+        // Recommendation B: Consolidate Search Query
+        const criteria: any = {
+            ids: inputs.compIds,
+            names: inputs.compNames,
+            folderNames: inputs.compFolderNames,
+            types: typeFilter,
+            exactNameMatch: true
+        };
+
+        const results = await platformService.searchComponents(criteria);
+
+        // Validation: Ensure all requested Names were resolved.
+        if (inputs.compNames && inputs.compNames.length > 0) {
+            const foundNames = new Set(results.map(c => c.name));
+            const missingNames = inputs.compNames.filter(n => !foundNames.has(n));
+            
+            if (missingNames.length > 0) {
+                throw new Error(`Could not resolve the following names (or they are not executable processes): ${missingNames.join(', ')}`);
+            }
+        }
+
+        // Deduplicate resolved components
+        const uniqueMap = new Map<string, ComponentInfo>();
+        results.forEach(c => uniqueMap.set(c.id, c));
+        
+        return Array.from(uniqueMap.values());
+    }
+
+    private async processTestModeComponents(resolvedComponents: ComponentInfo[], planId: string, credentialProfile: string): Promise<void> {
+        // We already have the metadata from resolveInputs (Recommendation A).
+        // No need to query getComponentInfo again for the resolved inputs.
+        
+        const planComponents: PlanComponent[] = resolvedComponents.map(info => ({
+            id: uuidv4(),
+            testPlanId: planId,
+            sourceType: 'ARG',
+            componentId: info.id,
+            componentName: info.name,
+            componentType: info.type
+        }));
 
         await this.planComponentRepository.saveAll(planComponents);
         
@@ -122,21 +159,22 @@ export class TestPlanService implements ITestPlanService {
         }
     }
 
-    private async processPlanComponents(entryPointIds: string[], testPlanId: string, credentialProfile: string, discoverDependencies: boolean): Promise<void> {
+    private async processPlanComponents(resolvedComponents: ComponentInfo[], testPlanId: string, credentialProfile: string, discoverDependencies: boolean): Promise<void> {
         const integrationPlatformService = await this.platformServiceFactory.createService(credentialProfile);
         const finalComponentsMap = new Map<string, ComponentInfo>();
 
+        // Pre-populate with resolved components to avoid re-fetching
+        resolvedComponents.forEach(info => finalComponentsMap.set(info.id, info));
+
         if (discoverDependencies) {
-            for (const id of entryPointIds) {
-                const discoveredMap = await this._findAllDependenciesRecursive(id, integrationPlatformService);
+            // Recommendation A: Use available info to traverse
+            // Note: We traverse starting from each resolved component ID
+            for (const info of resolvedComponents) {
+                const discoveredMap = await this._findAllDependenciesRecursive(info.id, integrationPlatformService);
                 discoveredMap.forEach((value, key) => finalComponentsMap.set(key, value));
             }
-        } else {
-            for (const id of entryPointIds) {
-                const info = await integrationPlatformService.getComponentInfo(id);
-                if (info) finalComponentsMap.set(id, info);
-            }
-        }
+        } 
+        // Else: We already collected them in finalComponentsMap
 
         const planComponents: PlanComponent[] = Array.from(finalComponentsMap.values()).map(info => ({
             id: uuidv4(),

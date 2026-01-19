@@ -14,6 +14,12 @@ export type TestPlanWithDetails = TestPlan & {
   planComponents: PlanComponentDetails[];
 };
 
+export interface CreateTestPlanInputs {
+  compIds?: string[];
+  compNames?: string[];
+  compFolderNames?: string[];
+}
+
 export interface ITestPlanService {
   /**
    * Retrieves a summary of all test plans.
@@ -32,12 +38,12 @@ export interface ITestPlanService {
    * Initiates the asynchronous creation of a new test plan.
    * @param name A descriptive name for the test plan.
    * @param planType The mode of operation (COMPONENT or TEST).
-   * @param componentIds An array of one or more component IDs to seed the plan.
+   * @param inputs The set of IDs, names, or folders to seed the plan.
    * @param credentialProfile The name of the credential profile to use for authentication.
    * @param discoverDependencies If true, recursively finds all dependencies.
    * @returns A new TestPlan in a 'DISCOVERING' state.
    */
-  initiateDiscovery(name: string, planType: TestPlanType, componentIds: string[], credentialProfile: string, discoverDependencies: boolean): Promise<TestPlan>;
+  initiateDiscovery(name: string, planType: TestPlanType, inputs: CreateTestPlanInputs, credentialProfile: string, discoverDependencies: boolean): Promise<TestPlan>;
 
   /**
    * Prepares a test plan for execution by validating its state, clearing previous results,
