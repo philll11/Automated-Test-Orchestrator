@@ -5,13 +5,12 @@ import { ITestPlanRepository } from '../ports/i_test_plan_repository.js';
 import { IPlanComponentRepository } from '../ports/i_plan_component_repository.js';
 import { PlanComponent } from '../domain/plan_component.js';
 import { IMappingRepository, AvailableTestInfo } from '../ports/i_mapping_repository.js';
-import { IIntegrationPlatformService, ComponentInfo } from '../ports/i_integration_platform_service.js';
+import { IIntegrationPlatformService } from '../ports/i_integration_platform_service.js';
 import { TestPlan, TestPlanStatus, TestPlanType } from '../domain/test_plan.js';
 import { TestPlanWithDetails } from '../ports/i_test_plan_service.js';
 import { ITestExecutionResultRepository } from '../ports/i_test_execution_result_repository.js';
 import { IIntegrationPlatformServiceFactory } from '../ports/i_integration_platform_service_factory.js';
 import { ITestPlanEntryPointRepository } from '../ports/i_test_plan_entry_point_repository.js';
-import { NotFoundError } from '../utils/app_error.js';
 import { IPlatformConfig } from '../infrastructure/config.js';
 
 // --- JEST MOCKS ---
@@ -282,6 +281,51 @@ describe('TestPlanService', () => {
             // Assert: The max concurrency should never exceed the configured limit (2)
             expect(maxConcurrent).toBe(mockConfig.concurrencyLimit);
             expect(mockIntegrationService.executeTestProcess).toHaveBeenCalledTimes(3);
+        });
+
+        it('should execute tests directly in TEST mode without looking up mappings', async () => {
+            // Arrange
+            const testModePlan: TestPlan = { 
+                id: 'plan-test-mode', 
+                name: 'Direct Execution Plan', 
+                planType: TestPlanType.TEST, 
+                status: TestPlanStatus.AWAITING_SELECTION, 
+                createdAt: new Date(), 
+                updatedAt: new Date() 
+            };
+            
+            // In TEST mode, componentId IS the testId
+            const testComponents: PlanComponent[] = [
+                { id: 'pc-1', testPlanId: 'plan-test-mode', componentId: 'test-direct-1', sourceType: 'ARG' },
+                { id: 'pc-2', testPlanId: 'plan-test-mode', componentId: 'test-direct-2', sourceType: 'ARG' },
+            ];
+
+            mockTestPlanRepo.findById.mockResolvedValue(testModePlan);
+            mockPlanComponentRepo.findByTestPlanId.mockResolvedValue(testComponents);
+            mockPlatformServiceFactory.createService.mockResolvedValue(mockIntegrationService);
+            
+            // Mock successful execution
+            mockIntegrationService.executeTestProcess.mockResolvedValue({ status: 'SUCCESS', message: 'Direct execution passed' });
+
+            // Act
+            await service.runTestExecution('plan-test-mode', undefined, credentialProfile);
+
+            // Assert
+            // Should NOT have called mapping repo for tests
+            expect(mockMappingRepo.findAllTestsForMainComponents).not.toHaveBeenCalled();
+            
+            // Should have executed both tests directly
+            expect(mockIntegrationService.executeTestProcess).toHaveBeenCalledTimes(2);
+            expect(mockIntegrationService.executeTestProcess).toHaveBeenCalledWith('test-direct-1');
+            expect(mockIntegrationService.executeTestProcess).toHaveBeenCalledWith('test-direct-2');
+
+            // Should have saved results
+            expect(mockTestExecutionResultRepo.save).toHaveBeenCalledTimes(2);
+            expect(mockTestExecutionResultRepo.save).toHaveBeenCalledWith(expect.objectContaining({
+                testPlanId: 'plan-test-mode', 
+                testComponentId: 'test-direct-1',
+                status: 'SUCCESS'
+            }));
         });
     });
 

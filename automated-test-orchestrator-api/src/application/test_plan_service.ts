@@ -232,26 +232,39 @@ export class TestPlanService implements ITestPlanService {
 
             const integrationPlatformService = await this.platformServiceFactory.createService(credentialProfile);
             const planComponents = await this.planComponentRepository.findByTestPlanId(planId);
-            const allAvailableTestsMap = await this.mappingRepository.findAllTestsForMainComponents(planComponents.map(c => c.componentId));
-
+            
             const testToPlanComponentMap = new Map<string, PlanComponent>();
-            allAvailableTestsMap.forEach((tests, mainComponentId) => {
-                const planComponent = planComponents.find(pc => pc.componentId === mainComponentId);
-                if (planComponent) {
-                    tests.forEach(test => testToPlanComponentMap.set(test.id, planComponent));
-                }
-            });
+            let finalTestsToExecute: string[] = [];
 
-            // If no specific tests were requested, run all available tests.
-            let finalTestsToExecute: string[];
-            console.log(`[DEBUG] testsToRun received: ${JSON.stringify(testsToRun)}`);
-            if (testsToRun && testsToRun.length > 0) {
-                finalTestsToExecute = testsToRun;
+            if (testPlan.planType === TestPlanType.TEST) {
+                // In TEST mode, the plan components are the executable tests themselves.
+                planComponents.forEach(pc => {
+                    testToPlanComponentMap.set(pc.componentId, pc);
+                });
+
+                if (testsToRun && testsToRun.length > 0) {
+                     finalTestsToExecute = testsToRun.filter(tId => testToPlanComponentMap.has(tId));
+                } else {
+                     finalTestsToExecute = planComponents.map(pc => pc.componentId);
+                }
             } else {
-                // Flatten the map values and extract just the test IDs for execution
-                finalTestsToExecute = Array.from(allAvailableTestsMap.values()).flat().map(test => test.id);
+                // In COMPONENT mode (default), discover tests via mappings.
+                const allAvailableTestsMap = await this.mappingRepository.findAllTestsForMainComponents(planComponents.map(c => c.componentId));
+
+                allAvailableTestsMap.forEach((tests, mainComponentId) => {
+                    const planComponent = planComponents.find(pc => pc.componentId === mainComponentId);
+                    if (planComponent) {
+                        tests.forEach(test => testToPlanComponentMap.set(test.id, planComponent));
+                    }
+                });
+
+                if (testsToRun && testsToRun.length > 0) {
+                    finalTestsToExecute = testsToRun;
+                } else {
+                    finalTestsToExecute = Array.from(allAvailableTestsMap.values()).flat().map(test => test.id);
+                }
             }
-            console.log(`[DEBUG] finalTestsToExecute: ${JSON.stringify(finalTestsToExecute)}`);
+
 
             const executionPromises = finalTestsToExecute.map(async (testId) => {
                 return limit(async () => {
@@ -261,9 +274,9 @@ export class TestPlanService implements ITestPlanService {
                         return;
                     }
                     try {
-                        console.log(`[DEBUG] Executing test ${testId}...`);
+                        // console.log(`[DEBUG] Executing test ${testId}...`);
                         const result = await integrationPlatformService.executeTestProcess(testId);
-                        console.log(`[DEBUG] Test ${testId} executed. Status: ${result.status}`);
+                        // console.log(`[DEBUG] Test ${testId} executed. Status: ${result.status}`);
                         const newResult: NewTestExecutionResult = {
                             testPlanId: planId,
                             planComponentId: planComponent.id,
@@ -273,7 +286,7 @@ export class TestPlanService implements ITestPlanService {
                             testCases: result.testCases
                         };
                         await this.testExecutionResultRepository.save(newResult);
-                        console.log(`[DEBUG] Result saved for test ${testId}`);
+                        // console.log(`[DEBUG] Result saved for test ${testId}`);
                     } catch (err) {
                         console.error(`[DEBUG] Error executing/saving test ${testId}:`, err);
                         throw err;
@@ -282,7 +295,7 @@ export class TestPlanService implements ITestPlanService {
             });
 
             const results = await Promise.allSettled(executionPromises);
-            console.log(`[DEBUG] All settled results:`, JSON.stringify(results));
+            // console.log(`[DEBUG] All settled results:`, JSON.stringify(results));
             await this.testPlanRepository.update({ ...testPlan, status: TestPlanStatus.COMPLETED, updatedAt: new Date() });
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';

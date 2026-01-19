@@ -79,6 +79,40 @@ describe('Execution End-to-End Test (POST /api/v1/test-plans/:planId/execute)', 
         expect(boomiScope.isDone()).toBe(true);
     });
 
+    it('TEST Mode: should execute tests directly without mapping lookups', async () => {
+        // --- Arrange ---
+        const planId = uuidv4();
+        await testPool.query(`INSERT INTO test_plans (id, name, status, plan_type, created_at, updated_at) VALUES ($1, 'Direct Exec Plan', 'AWAITING_SELECTION', 'TEST', NOW(), NOW())`, [planId]);
+
+        const testId = 'test-direct-exec-1';
+        const planComponentId = uuidv4();
+        // In TEST mode, the component_id IS the test_id
+        await testPool.query(`INSERT INTO plan_components (id, test_plan_id, component_id, component_name, source_type) VALUES ($1, $2, $3, 'Direct Test', 'ARG')`, [planComponentId, planId, testId]);
+
+        // CRITICAL: We do NOT insert any mappings. This proves the system isn't using them.
+
+        const boomiScope = nock(BOOMI_API_BASE)
+            .post(`${baseApiUrl}/ExecutionRequest`).reply(200, { requestId: 'direct-1' })
+            .get(`${baseApiUrl}/ExecutionRecord/async/direct-1`).reply(200, { responseStatusCode: 200, result: [{ status: 'COMPLETE' }] });
+
+        // --- Act ---
+        // In TEST mode, if testsToRun is omitted, it should run all plan components (which are tests)
+        await request(app).post(`/api/v1/test-plans/${planId}/execute`).send({ credentialProfile: testProfileName }).expect(202);
+        
+        await new Promise(resolve => setTimeout(resolve, 500)); // Wait for async processing
+
+        // --- Assert ---
+        const finalPlanResult = await testPool.query('SELECT status FROM test_plans WHERE id = $1', [planId]);
+        expect(finalPlanResult.rows[0].status).toBe('COMPLETED');
+
+        const resultsResult = await testPool.query('SELECT * FROM test_execution_results WHERE plan_component_id = $1', [planComponentId]);
+        expect(resultsResult.rowCount).toBe(1);
+        expect(resultsResult.rows[0].status).toBe('SUCCESS');
+        expect(resultsResult.rows[0].test_component_id).toBe(testId);
+
+        expect(boomiScope.isDone()).toBe(true);
+    });
+
     it('should handle a failed test and record the failure message', async () => {
         // --- Arrange ---
         const planId = uuidv4();
@@ -107,7 +141,8 @@ describe('Execution End-to-End Test (POST /api/v1/test-plans/:planId/execute)', 
         const resultsResult = await testPool.query('SELECT * FROM test_execution_results WHERE plan_component_id = $1', [planComponentId]);
         expect(resultsResult.rowCount).toBe(1);
         expect(resultsResult.rows[0].status).toBe('FAILURE');
-        expect(resultsResult.rows[0].message).toBe(failureMessage);
+        // The service wraps the error message, so we check for partial match or the full wrapped string
+        expect(resultsResult.rows[0].message).toContain(failureMessage);
         
         expect(boomiScope.isDone()).toBe(true);
     });

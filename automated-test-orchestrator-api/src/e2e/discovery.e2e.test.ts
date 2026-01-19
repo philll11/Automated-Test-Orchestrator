@@ -86,6 +86,41 @@ describe('Discovery End-to-End Tests (POST /api/v1/test-plans)', () => {
         expect(boomiScope.isDone()).toBe(true);
     });
 
+    it('TEST Mode: should validate inputs are executable tests and ignore mappings', async () => {
+        // --- Arrange ---
+        const testIds = ['test-direct-X'];
+        const requestBody = { name: 'Test Mode Plan', planType: 'TEST', componentIds: testIds, credentialProfile: testProfileName };
+
+        // Mock Boomi to confirm the ID exists (it treats it as a component lookup)
+        const boomiScope = nock(BOOMI_API_BASE)
+            .get(`${baseApiUrl}/ComponentMetadata/test-direct-X`).reply(200, { name: 'Direct Test X', type: 'PROCESS' });
+
+        // --- Act ---
+        const initialResponse = await request(app).post('/api/v1/test-plans').send(requestBody).expect(202);
+        const planId = initialResponse.body.data.id;
+
+        expect(initialResponse.body.data.planType).toBe('TEST');
+
+        await new Promise(resolve => setTimeout(resolve, 500)); // Wait for async processing
+
+        // --- Assert ---
+        const planResult = await testPool.query('SELECT name, status, plan_type FROM test_plans WHERE id = $1', [planId]);
+        expect(planResult.rows[0].status).toBe('AWAITING_SELECTION');
+        expect(planResult.rows[0].plan_type).toBe('TEST');
+
+        const detailsResponse = await request(app).get(`/api/v1/test-plans/${planId}`).expect(200);
+        const planDetails = detailsResponse.body.data;
+        
+        expect(planDetails.planComponents).toHaveLength(1);
+        expect(planDetails.planComponents[0].componentId).toBe('test-direct-X');
+        expect(planDetails.planComponents[0].componentName).toBe('Direct Test X');
+        
+        // Mappings were NOT seeded, so availableTests should be empty (standard behavior for TEST mode currently)
+        expect(planDetails.planComponents[0].availableTests).toEqual([]);
+        
+        expect(boomiScope.isDone()).toBe(true);
+    });
+
     it('Recursive Mode: should discover all dependencies and their rich test info', async () => {
         // --- Arrange ---
         const componentIds = ['root-e2e-123'];

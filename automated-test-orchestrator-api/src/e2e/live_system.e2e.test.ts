@@ -152,6 +152,7 @@ conditionalDescribe('Live System End-to-End Tests', () => {
             const resultsDbResult = await testPool.query('SELECT status, message FROM test_execution_results WHERE test_plan_id = $1', [planId]);
             expect(resultsDbResult.rowCount).toBe(2);
             // UPDATED: Check for the 'message' field instead of 'log'
+            
             expect(resultsDbResult.rows.every(r => r.status === 'SUCCESS')).toBe(true);
             expect(resultsDbResult.rows[0].message).toBeDefined(); // Live tests should return a message
         }, 75000);

@@ -60,10 +60,10 @@ describe('GET /api/v1/test-execution-results End-to-End Test', () => {
             .query({ testPlanId: plan2Id })
             .expect(200);
 
-        expect(response.body).toHaveLength(1);
-        expect(response.body[0].testPlanId).toBe(plan2Id);
-        expect(response.body[0].componentName).toBe('Component C');
-        expect(response.body[0].testComponentName).toBe('Test for C1');
+        expect(response.body.data).toHaveLength(1);
+        expect(response.body.data[0].testPlanId).toBe(plan2Id);
+        expect(response.body.data[0].componentName).toBe('Component C');
+        expect(response.body.data[0].testComponentName).toBe('Test for C1');
     });
 
     it('should filter results by status', async () => {
@@ -72,9 +72,9 @@ describe('GET /api/v1/test-execution-results End-to-End Test', () => {
             .query({ status: 'FAILURE' })
             .expect(200);
 
-        expect(response.body).toHaveLength(1);
-        expect(response.body[0].status).toBe('FAILURE');
-        expect(response.body[0].testComponentId).toBe('test-A2');
+        expect(response.body.data).toHaveLength(1);
+        expect(response.body.data[0].status).toBe('FAILURE');
+        expect(response.body.data[0].testComponentId).toBe('test-A2');
     });
 
     it('should filter by a combination of testPlanId and status', async () => {
@@ -83,20 +83,19 @@ describe('GET /api/v1/test-execution-results End-to-End Test', () => {
             .query({ testPlanId: plan1Id, status: 'SUCCESS' })
             .expect(200);
 
-        expect(response.body).toHaveLength(2);
-        expect(response.body.every((r: any) => r.testPlanId === plan1Id && r.status === 'SUCCESS')).toBe(true);
+        expect(response.body.data).toHaveLength(2);
+        expect(response.body.data.every((r: any) => r.testPlanId === plan1Id && r.status === 'SUCCESS')).toBe(true);
     });
 
-    it('should filter by planComponentId', async () => {
-        // CORRECTED: The query parameter is now 'planComponentId'
+    it('should filter by componentId', async () => {
         const response = await request(app)
             .get('/api/v1/test-execution-results')
-            .query({ planComponentId: pc1Id })
+            .query({ componentId: 'comp-A' })
             .expect(200);
 
-        expect(response.body).toHaveLength(2);
-        expect(response.body[0].componentName).toBe('Component A');
-        expect(response.body[1].componentName).toBe('Component A');
+        expect(response.body.data).toHaveLength(2);
+        expect(response.body.data[0].componentName).toBe('Component A');
+        expect(response.body.data[1].componentName).toBe('Component A');
     });
 
     it('should return an empty array if no results match the filter', async () => {
@@ -105,7 +104,7 @@ describe('GET /api/v1/test-execution-results End-to-End Test', () => {
             .query({ testPlanId: uuidv4() })
             .expect(200);
 
-        expect(response.body).toHaveLength(0);
+        expect(response.body.data).toHaveLength(0);
     });
 
     it('should return an empty array if no filters are provided', async () => {
@@ -113,6 +112,6 @@ describe('GET /api/v1/test-execution-results End-to-End Test', () => {
             .get('/api/v1/test-execution-results')
             .expect(200);
 
-        expect(response.body).toHaveLength(0);
+        expect(response.body.data).toHaveLength(0);
     });
 });
