@@ -24,12 +24,5 @@ export class PlatformConfig implements IPlatformConfig {
     this.maxRetries = parseInt(process.env.PLATFORM_MAX_RETRIES || '5', 10);
     this.initialDelay = parseInt(process.env.PLATFORM_INITIAL_DELAY || '1000', 10);
     this.concurrencyLimit = parseInt(process.env.PLATFORM_CONCURRENCY_LIMIT || '5', 10);
-
-    console.log('[CONFIG] Integration Platform Service configured with:');
-    console.log(`  -> Poll Interval: ${this.pollInterval}ms`);
-    console.log(`  -> Max Polls: ${this.maxPolls}`);
-    console.log(`  -> Max Retries: ${this.maxRetries}`);
-    console.log(`  -> Initial Retry Delay: ${this.initialDelay}ms`);
-    console.log(`  -> Concurrency Limit: ${this.concurrencyLimit}`);
   }
 }

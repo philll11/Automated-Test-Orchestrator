@@ -7,5 +7,3 @@ const envPath = path.resolve(process.cwd(), '.env.test');
 
 // Load the environment file
 dotenv.config({ path: envPath });
-
-console.log(`[Jest Setup] Loaded DB_USER: ${process.env.DB_USER}`); // Example log to verify loading

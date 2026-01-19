@@ -47,7 +47,7 @@ export class BoomiService implements IIntegrationPlatformService {
 
     constructor(credentials: IntegrationPlatformCredentials, options: any = {}) {
 
-        console.log(`[ADAPTER] Creating BoomiService for account: ${credentials.accountId}`);
+        // console.log(`[ADAPTER] Creating BoomiService for account: ${credentials.accountId}`);
 
         this.apiClient = axios.create({
             baseURL: `https://api.boomi.com/api/rest/v1/${credentials.accountId}`,
@@ -96,11 +96,11 @@ export class BoomiService implements IIntegrationPlatformService {
 
     private async getComponentMetadata(componentId: string): Promise<ComponentMetadataResponse | null> {
 
-        console.log(`[ADAPTER] getComponentVersion called for component: ${componentId}`);
+        // console.log(`[ADAPTER] getComponentVersion called for component: ${componentId}`);
 
         try {
             return await this._requestWithRetry(async () => {
-                console.log(`[ADAPTER] Fetching metadata for component: ${componentId}`);
+                // console.log(`[ADAPTER] Fetching metadata for component: ${componentId}`);
                 const response = await this.apiClient.get<ComponentMetadataResponse>(`/ComponentMetadata/${componentId}`);
                 return response.data;
             });
@@ -141,7 +141,7 @@ export class BoomiService implements IIntegrationPlatformService {
         try {
 
             return await this._requestWithRetry(async () => {
-                console.log(`[ADAPTER] Fetching dependencies for component: ${componentId}`);
+                // console.log(`[ADAPTER] Fetching dependencies for component: ${componentId}`);
                 const response = await this.apiClient.post<ComponentReferenceQueryResponse>('/ComponentReference/query', {
                     QueryFilter: {
                         expression: {

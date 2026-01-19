@@ -9,7 +9,7 @@ export class InMemorySecureCredentialService implements ISecureCredentialService
   private store = new Map<string, IntegrationPlatformCredentials>();
 
   constructor() {
-    console.log('[ADAPTER] Using InMemorySecureCredentialService for this session.');
+    // Adapter initialized
   }
 
   async addCredentials(profileName: string, credentials: IntegrationPlatformCredentials): Promise<void> {
