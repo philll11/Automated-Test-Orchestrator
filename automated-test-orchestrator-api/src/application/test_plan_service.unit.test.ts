@@ -6,7 +6,7 @@ import { IPlanComponentRepository } from '../ports/i_plan_component_repository.j
 import { PlanComponent } from '../domain/plan_component.js';
 import { IMappingRepository, AvailableTestInfo } from '../ports/i_mapping_repository.js';
 import { IIntegrationPlatformService, ComponentInfo } from '../ports/i_integration_platform_service.js';
-import { TestPlan } from '../domain/test_plan.js';
+import { TestPlan, TestPlanStatus, TestPlanType } from '../domain/test_plan.js';
 import { TestPlanWithDetails } from '../ports/i_test_plan_service.js';
 import { ITestExecutionResultRepository } from '../ports/i_test_execution_result_repository.js';
 import { IIntegrationPlatformServiceFactory } from '../ports/i_integration_platform_service_factory.js';
@@ -39,6 +39,7 @@ const mockMappingRepo: jest.Mocked<IMappingRepository> = {
     findByMainComponentId: jest.fn(),
     findAll: jest.fn(),
     findAllTestsForMainComponents: jest.fn(),
+    findByComponentIds: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
 };
@@ -47,6 +48,7 @@ const mockTestExecutionResultRepo: jest.Mocked<ITestExecutionResultRepository> =
     save: jest.fn(),
     findByPlanComponentIds: jest.fn(),
     findByFilters: jest.fn(),
+    deleteByTestPlanId: jest.fn(),
 };
 
 const mockIntegrationService: jest.Mocked<IIntegrationPlatformService> = {
@@ -56,7 +58,7 @@ const mockIntegrationService: jest.Mocked<IIntegrationPlatformService> = {
 };
 
 const mockPlatformServiceFactory: jest.Mocked<IIntegrationPlatformServiceFactory> = {
-    create: jest.fn(),
+    createService: jest.fn(),
 };
 
 // --- MOCK CONFIG (NEW) ---
@@ -97,8 +99,8 @@ describe('TestPlanService', () => {
     describe('getAllPlans', () => {
         it('should return all plans with their names', async () => {
             const mockPlans: TestPlan[] = [
-                { id: 'plan-1', name: 'Plan One', status: 'COMPLETED', createdAt: new Date(), updatedAt: new Date() },
-                { id: 'plan-2', name: 'Plan Two', status: 'DISCOVERY_FAILED', createdAt: new Date(), updatedAt: new Date() },
+                { id: 'plan-1', name: 'Plan One', planType: TestPlanType.COMPONENT, status: TestPlanStatus.COMPLETED, createdAt: new Date(), updatedAt: new Date() },
+                { id: 'plan-2', name: 'Plan Two', planType: TestPlanType.COMPONENT, status: TestPlanStatus.DISCOVERY_FAILED, createdAt: new Date(), updatedAt: new Date() },
             ];
             mockTestPlanRepo.findAll.mockResolvedValue(mockPlans);
             const result = await service.getAllPlans();
@@ -110,10 +112,10 @@ describe('TestPlanService', () => {
     describe('getPlanWithDetails', () => {
         it('should return an enriched plan with available tests as objects', async () => {
             const planId = 'plan-abc';
-            const mockPlan: TestPlan = { id: planId, name: 'Detailed Plan', status: 'COMPLETED', createdAt: new Date(), updatedAt: new Date() };
+            const mockPlan: TestPlan = { id: planId, name: 'Detailed Plan', planType: TestPlanType.COMPONENT, status: TestPlanStatus.COMPLETED, createdAt: new Date(), updatedAt: new Date() };
             const mockComponents: PlanComponent[] = [
-                { id: 'pc-1', testPlanId: planId, componentId: 'comp-A' },
-                { id: 'pc-2', testPlanId: planId, componentId: 'comp-B' },
+                { id: 'pc-1', testPlanId: planId, componentId: 'comp-A', sourceType: 'Boomi' },
+                { id: 'pc-2', testPlanId: planId, componentId: 'comp-B', sourceType: 'Boomi' },
             ];
             const mockResults: any[] = [{ id: 'res-1', planComponentId: 'pc-1', testComponentId: 'test-A', status: 'SUCCESS' }];
             // UPDATED: Mappings now return AvailableTestInfo objects
@@ -150,43 +152,73 @@ describe('TestPlanService', () => {
             const processSpy = jest.spyOn(service as any, 'processPlanComponents').mockResolvedValue(undefined);
 
             // UPDATED: Pass the name parameter
-            const result = await service.initiateDiscovery(planName, componentIds, credentialProfile, true);
+            const result = await service.initiateDiscovery(planName, TestPlanType.COMPONENT, componentIds, credentialProfile, true);
 
             expect(result.name).toBe(planName); // ADDED: Check name
-            expect(result.status).toBe('DISCOVERING');
+            expect(result.status).toBe(TestPlanStatus.DISCOVERING);
             // UPDATED: Check that the name is passed to the save method
-            expect(mockTestPlanRepo.save).toHaveBeenCalledWith(expect.objectContaining({ name: planName, status: 'DISCOVERING' }));
+            expect(mockTestPlanRepo.save).toHaveBeenCalledWith(expect.objectContaining({ name: planName, planType: TestPlanType.COMPONENT, status: TestPlanStatus.DISCOVERING }));
             expect(mockTestPlanEntryPointRepo.saveAll).toHaveBeenCalled();
             expect(processSpy).toHaveBeenCalledWith(componentIds, 'plan-uuid', credentialProfile, true);
         });
 
-        it('should update the plan to DISCOVERY_FAILED if async processing fails', async () => {
-            mockTestPlanRepo.save.mockImplementation(async (plan) => ({ ...plan, id: 'plan-uuid' }));
-            const apiError = new Error("API is down");
+        it('should handle errors in async processing and update TestPlan status', async () => {
+            const apiError = new Error('Integration API failure');
+            mockTestPlanRepo.save.mockImplementation(async (plan) => ({ ...plan, id: 'plan-fail' }));
+            // Mock dependency injection of platform service
+            mockPlatformServiceFactory.createService.mockResolvedValue(mockIntegrationService);
+
+            // Spy on internal method to simulate async error
             jest.spyOn(service as any, 'processPlanComponents').mockRejectedValue(apiError);
 
-            await service.initiateDiscovery(planName, componentIds, credentialProfile, false);
-            await allowAsyncOperations();
+            await service.initiateDiscovery(planName, TestPlanType.COMPONENT, componentIds, credentialProfile, false);
+
+            await allowAsyncOperations(); // Wait for promise chain
 
             expect(mockTestPlanRepo.update).toHaveBeenCalledWith(expect.objectContaining({
-                status: 'DISCOVERY_FAILED',
-                failureReason: apiError.message,
+                id: 'plan-fail',
+                status: TestPlanStatus.DISCOVERY_FAILED,
+                failureReason: 'Integration API failure'
             }));
         });
     });
 
+    describe('initiateDiscovery (TEST Mode)', () => {
+        const planName = 'Test-Only Plan';
+        const testIds = ['test-1', 'test-2'];
+        const credentialProfile = 'test-profile';
+
+        it('should create a TestPlan in TEST mode and trigger processTestModeComponents', async () => {
+            mockTestPlanRepo.save.mockImplementation(async (plan) => ({ ...plan, id: 'plan-test-uuid' }));
+            // Spy on the test mode processing method
+            const processTestSpy = jest.spyOn(service as any, 'processTestModeComponents').mockResolvedValue(undefined);
+            const processComponentSpy = jest.spyOn(service as any, 'processPlanComponents');
+
+            await service.initiateDiscovery(planName, TestPlanType.TEST, testIds, credentialProfile, false);
+
+            expect(mockTestPlanRepo.save).toHaveBeenCalledWith(expect.objectContaining({
+                name: planName,
+                planType: TestPlanType.TEST
+            }));
+
+            // Should call TEST handler, NOT COMPONENT handler
+            expect(processTestSpy).toHaveBeenCalledWith(testIds, 'plan-test-uuid', credentialProfile);
+            expect(processComponentSpy).not.toHaveBeenCalled();
+        });
+    });
+
+
     // `processPlanComponents` tests do not require changes as they don't deal with the new fields directly.
 
-    describe('executeTests', () => {
+    describe('runTestExecution', () => {
         const planId = 'plan-to-execute';
         const planName = 'Execution Plan';
         const credentialProfile = 'test-profile';
-        const createReadyTestPlan = (): TestPlan => ({ id: planId, name: planName, status: 'AWAITING_SELECTION', createdAt: new Date(), updatedAt: new Date() });
+        const createReadyTestPlan = (): TestPlan => ({ id: planId, name: planName, planType: TestPlanType.COMPONENT, status: TestPlanStatus.AWAITING_SELECTION, createdAt: new Date(), updatedAt: new Date() });
         const createPlanComponents = (): PlanComponent[] => [
-            { id: 'pc-1', testPlanId: planId, componentId: 'comp-A' },
-            { id: 'pc-2', testPlanId: planId, componentId: 'comp-B' },
+            { id: 'pc-1', testPlanId: planId, componentId: 'comp-A', sourceType: 'Boomi' },
+            { id: 'pc-2', testPlanId: planId, componentId: 'comp-B', sourceType: 'Boomi' },
         ];
-        
         // UPDATED: Mappings now return AvailableTestInfo objects
         const createMappings = () => new Map<string, AvailableTestInfo[]>([
             ['comp-A', [{ id: 'test-A1', name: 'Test A1' }, { id: 'test-A2', name: 'Test A2' }]],
@@ -197,7 +229,7 @@ describe('TestPlanService', () => {
             mockTestPlanRepo.findById.mockResolvedValue(createReadyTestPlan());
             mockPlanComponentRepo.findByTestPlanId.mockResolvedValue(createPlanComponents());
             mockMappingRepo.findAllTestsForMainComponents.mockResolvedValue(createMappings());
-            mockPlatformServiceFactory.create.mockResolvedValue(mockIntegrationService);
+            mockPlatformServiceFactory.createService.mockResolvedValue(mockIntegrationService);
             mockIntegrationService.executeTestProcess.mockImplementation(async (testId) => {
                 // Simulate a failure for a specific test
                 if (testId === 'test-A2') {
@@ -209,7 +241,7 @@ describe('TestPlanService', () => {
 
         it('should execute ALL available tests and save results with a `message` property', async () => {
             setupCommonMocks();
-            await service.executeTests(planId, undefined, credentialProfile);
+            await service.runTestExecution(planId, undefined, credentialProfile);
 
             expect(mockIntegrationService.executeTestProcess).toHaveBeenCalledTimes(3);
             expect(mockTestExecutionResultRepo.save).toHaveBeenCalledTimes(3);
@@ -226,7 +258,7 @@ describe('TestPlanService', () => {
                 message: 'Assertion failed',
             }));
 
-            expect(mockTestPlanRepo.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'COMPLETED' }));
+            expect(mockTestPlanRepo.update).toHaveBeenCalledWith(expect.objectContaining({ status: TestPlanStatus.COMPLETED }));
         });
 
         it('should respect the concurrency limit when executing tests', async () => {
@@ -245,7 +277,7 @@ describe('TestPlanService', () => {
             });
 
             // Act: Execute all 3 tests
-            await service.executeTests(planId, undefined, credentialProfile);
+            await service.runTestExecution(planId, undefined, credentialProfile);
 
             // Assert: The max concurrency should never exceed the configured limit (2)
             expect(maxConcurrent).toBe(mockConfig.concurrencyLimit);

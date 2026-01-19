@@ -138,9 +138,9 @@ conditionalDescribe('Live System End-to-End Tests', () => {
 
             planId = uuidv4();
             // UPDATED: Added 'name' to the INSERT statement
-            await testPool.query(`INSERT INTO test_plans (id, name, status, created_at, updated_at) VALUES ($1, 'Live Execution Plan', 'AWAITING_SELECTION', NOW(), NOW())`, [planId]);
-            await testPool.query(`INSERT INTO plan_components (id, test_plan_id, component_id) VALUES ($1, $2, $3)`, [uuidv4(), planId, liveRootComponentId]);
-            await testPool.query(`INSERT INTO plan_components (id, test_plan_id, component_id) VALUES ($1, $2, $3)`, [uuidv4(), planId, liveDependencyId]);
+            await testPool.query(`INSERT INTO test_plans (id, name, status, plan_type, created_at, updated_at) VALUES ($1, 'Live Execution Plan', 'AWAITING_SELECTION', 'COMPONENT', NOW(), NOW())`, [planId]);
+            await testPool.query(`INSERT INTO plan_components (id, test_plan_id, component_id, source_type) VALUES ($1, $2, $3, 'DIRECT')`, [uuidv4(), planId, liveRootComponentId]);
+            await testPool.query(`INSERT INTO plan_components (id, test_plan_id, component_id, source_type) VALUES ($1, $2, $3, 'DIRECT')`, [uuidv4(), planId, liveDependencyId]);
         });
 
         it('should execute multiple tests and create successful result records', async () => {
@@ -162,8 +162,8 @@ conditionalDescribe('Live System End-to-End Tests', () => {
             const planId = uuidv4();
             const planComponentId = uuidv4();
             // UPDATED: Added 'name' to the INSERT statement
-            await testPool.query(`INSERT INTO test_plans (id, name, status, created_at, updated_at) VALUES ($1, 'Live Query Plan', 'AWAITING_SELECTION', NOW(), NOW())`, [planId]);
-            await testPool.query(`INSERT INTO plan_components (id, test_plan_id, component_id, component_name) VALUES ($1, $2, $3, 'Live Root')`, [planComponentId, planId, liveRootComponentId]);
+            await testPool.query(`INSERT INTO test_plans (id, name, status, plan_type, created_at, updated_at) VALUES ($1, 'Live Query Plan', 'AWAITING_SELECTION', 'COMPONENT', NOW(), NOW())`, [planId]);
+            await testPool.query(`INSERT INTO plan_components (id, test_plan_id, component_id, component_name, source_type) VALUES ($1, $2, $3, 'Live Root', 'DIRECT')`, [planComponentId, planId, liveRootComponentId]);
             await testPool.query(
                 'INSERT INTO mappings (id, main_component_id, test_component_id, test_component_name, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW())',
                 [uuidv4(), liveRootComponentId, liveTestComponentId, 'Live Query Test']

@@ -19,16 +19,18 @@ import (
 
 // discoverCmd represents the discover command
 var discoverCmd = &cobra.Command{
-	Use:   "discover [componentIds...]",
-	Short: "Create a new test plan from a list of components",
-	Long: `Creates a new test plan. Provide component IDs as arguments, from a CSV file,
+	Use:   "discover",
+	Short: "Create a new test plan",
+	Long: `Creates a new test plan. Provide component/test IDs via --entry-id, from a CSV file,
 or interactively if no other input is given.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		s := spinner.New(spinner.CharSets[11], 100*time.Millisecond, spinner.WithWriter(os.Stderr))
 		s.Suffix = " Preparing test plan..."
 		s.Start()
 
-		name, _ := cmd.Flags().GetString("name")
+		planName, _ := cmd.Flags().GetString("plan-name")
+		planType, _ := cmd.Flags().GetString("type")
+		entryIDs, _ := cmd.Flags().GetStringArray("entry-id")
 		fromCsv, _ := cmd.Flags().GetString("from-csv")
 		dependencies, _ := cmd.Flags().GetBool("dependencies")
 		creds, _ := cmd.Flags().GetString("creds")
@@ -51,8 +53,8 @@ or interactively if no other input is given.`,
 				style.Error("Failed to parse CSV file: %v", err)
 				os.Exit(1)
 			}
-		} else if len(args) > 0 {
-			componentIds = args
+		} else if len(entryIDs) > 0 {
+			componentIds = entryIDs
 		} else {
 			s.Stop() // Stop for interactive prompt
 			componentIds, err = promptForComponentIDs(dependencies)
@@ -73,10 +75,10 @@ or interactively if no other input is given.`,
 		if dependencies {
 			discoveryMode = " and all their dependencies"
 		}
-		s.Suffix = fmt.Sprintf(" Creating test plan '%s' with %d component(s)%s...", name, len(componentIds), discoveryMode)
+		s.Suffix = fmt.Sprintf(" Creating test plan '%s' with %d component(s)%s...", planName, len(componentIds), discoveryMode)
 
 		apiClient := client.NewAPIClient(viper.GetString("api_url"))
-		planID, err := apiClient.InitiateDiscovery(name, componentIds, creds, dependencies)
+		planID, err := apiClient.InitiateDiscovery(planName, planType, componentIds, creds, dependencies)
 		if err != nil {
 			s.Stop()
 			style.Error("Failed to initiate discovery: %v", err)
@@ -131,12 +133,14 @@ func promptForComponentIDs(dependencies bool) ([]string, error) {
 
 func init() {
 	rootCmd.AddCommand(discoverCmd)
-	discoverCmd.Flags().String("name", "", "A descriptive name for the test plan (required)")
+	discoverCmd.Flags().String("plan-name", "", "A descriptive name for the test plan (required)")
+	discoverCmd.Flags().String("type", "COMPONENT", "Plan Mode: COMPONENT (default) or TEST")
+	discoverCmd.Flags().StringArray("entry-id", []string{}, "ID of component or test to include (can be used multiple times)")
 	discoverCmd.Flags().String("from-csv", "", "Path to a CSV file with a single column of 'componentId's")
 	discoverCmd.Flags().Bool("dependencies", false, "Discover all dependencies for the provided components")
 	discoverCmd.Flags().String("creds", "", "The name of the credential profile to use (required)")
 
-	discoverCmd.MarkFlagRequired("name")
+	discoverCmd.MarkFlagRequired("plan-name")
 	discoverCmd.MarkFlagRequired("creds")
 
 	discoverCmd.Flags().SortFlags = false

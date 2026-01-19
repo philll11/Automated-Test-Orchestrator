@@ -47,7 +47,7 @@ describe('Discovery End-to-End Tests (POST /api/v1/test-plans)', () => {
         // --- Arrange ---
         const componentIds = ['comp-e2e-A', 'comp-e2e-B'];
         // UPDATED: Request body now includes the 'name'
-        const requestBody = { name: planName, componentIds, credentialProfile: testProfileName, discoverDependencies: false };
+        const requestBody = { name: planName, planType: 'COMPONENT', componentIds, credentialProfile: testProfileName, discoverDependencies: false };
 
         // UPDATED: Seed mappings with the richer structure
         await testPool.query(
@@ -90,7 +90,7 @@ describe('Discovery End-to-End Tests (POST /api/v1/test-plans)', () => {
         // --- Arrange ---
         const componentIds = ['root-e2e-123'];
         const childComponentId = 'child-e2e-456';
-        const requestBody = { name: planName, componentIds, credentialProfile: testProfileName, discoverDependencies: true };
+        const requestBody = { name: planName, planType: 'COMPONENT', componentIds, credentialProfile: testProfileName, discoverDependencies: true };
 
         await testPool.query(
             'INSERT INTO mappings (id, main_component_id, test_component_id, test_component_name, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW())',
@@ -123,7 +123,8 @@ describe('Discovery End-to-End Tests (POST /api/v1/test-plans)', () => {
         const rootA = 'root-A';
         const rootB = 'root-B';
         const sharedChild = 'shared-child';
-        const requestBody = { componentIds: [rootA, rootB], credentialProfile: testProfileName, discoverDependencies: true };
+        // UPDATED: Added name and planType
+        const requestBody = { name: 'Dedupe Plan', planType: 'COMPONENT', componentIds: [rootA, rootB], credentialProfile: testProfileName, discoverDependencies: true };
 
         const boomiScope = nock(BOOMI_API_BASE)
             // Discovery for Root A

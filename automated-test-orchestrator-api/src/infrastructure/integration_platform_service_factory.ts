@@ -16,7 +16,7 @@ export class IntegrationPlatformServiceFactory implements IIntegrationPlatformSe
     @inject(TYPES.IPlatformConfig) private config: IPlatformConfig
   ) { }
 
-  public async create(profileName: string): Promise<IIntegrationPlatformService> {
+  public async createService(profileName: string): Promise<IIntegrationPlatformService> {
     const credentials = await this.secureCredentialService.getCredentials(profileName);
     if (!credentials) {
       throw new NotFoundError(`Credential profile "${profileName}" not found.`);

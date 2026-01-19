@@ -11,6 +11,7 @@ const mockMappingRepo: jest.Mocked<IMappingRepository> = {
     findById: jest.fn(),
     findByMainComponentId: jest.fn(),
     findAll: jest.fn(),
+    findByComponentIds: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
     findAllTestsForMainComponents: jest.fn(),

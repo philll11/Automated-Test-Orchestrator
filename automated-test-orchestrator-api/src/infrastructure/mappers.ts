@@ -15,6 +15,7 @@ export function rowToTestPlan(row: any): TestPlan {
   return {
     id: row.id,
     name: row.name,
+    planType: row.plan_type,
     status: row.status,
     failureReason: row.failure_reason,
     createdAt: row.created_at,
@@ -32,6 +33,7 @@ export function rowToPlanComponent(row: any): PlanComponent {
   return {
     id: row.id,
     testPlanId: row.test_plan_id,
+    sourceType: row.source_type,
     componentId: row.component_id,
     componentName: row.component_name,
     componentType: row.component_type

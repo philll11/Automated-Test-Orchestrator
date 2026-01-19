@@ -2,10 +2,10 @@
 
 import { Pool } from 'pg';
 import { v4 as uuidv4 } from 'uuid';
-import { TestExecutionResultRepository } from './test_execution_result_repository';
-import { TestPlan } from '../../domain/test_plan';
-import { PlanComponent } from '../../domain/plan_component';
-import { Mapping } from '../../domain/mapping';
+import { TestExecutionResultRepository } from './test_execution_result_repository.js';
+import { TestPlan, TestPlanStatus, TestPlanType } from '../../domain/test_plan.js';
+import { PlanComponent } from '../../domain/plan_component.js';
+import { Mapping } from '../../domain/mapping.js';
 
 describe('TestExecutionResultRepository Integration Tests', () => {
     let repository: TestExecutionResultRepository;
@@ -38,24 +38,26 @@ describe('TestExecutionResultRepository Integration Tests', () => {
         parentTestPlan = {
             id: uuidv4(),
             name: 'Parent Execution Plan',
-            status: 'EXECUTING',
+            planType: TestPlanType.COMPONENT,
+            status: TestPlanStatus.EXECUTING,
             createdAt: new Date(),
             updatedAt: new Date(),
         };
         await testPool.query(
-            'INSERT INTO test_plans (id, name, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)',
-            [parentTestPlan.id, parentTestPlan.name, parentTestPlan.status, parentTestPlan.createdAt, parentTestPlan.updatedAt]
+            'INSERT INTO test_plans (id, name, plan_type, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)',
+            [parentTestPlan.id, parentTestPlan.name, parentTestPlan.planType, parentTestPlan.status, parentTestPlan.createdAt, parentTestPlan.updatedAt]
         );
 
         parentPlanComponent = {
             id: uuidv4(),
             testPlanId: parentTestPlan.id,
+            sourceType: 'Boomi',
             componentId: 'comp-for-results',
             componentName: 'Results Parent Component',
         };
         await testPool.query(
-            'INSERT INTO plan_components (id, test_plan_id, component_id, component_name) VALUES ($1, $2, $3, $4)',
-            [parentPlanComponent.id, parentPlanComponent.testPlanId, parentPlanComponent.componentId, parentPlanComponent.componentName]
+            'INSERT INTO plan_components (id, test_plan_id, source_type, component_id, component_name) VALUES ($1, $2, $3, $4, $5)',
+            [parentPlanComponent.id, parentPlanComponent.testPlanId, parentPlanComponent.sourceType, parentPlanComponent.componentId, parentPlanComponent.componentName]
         );
 
         // UPDATED: parentMapping now includes 'mainComponentName'
@@ -120,10 +122,10 @@ describe('TestExecutionResultRepository Integration Tests', () => {
 
         beforeEach(async () => {
             // UPDATED: Seeding for the second plan now requires a 'name'
-            plan2 = { id: uuidv4(), name: 'Plan Two', status: 'COMPLETED', createdAt: new Date(), updatedAt: new Date() };
-            pc2 = { id: uuidv4(), testPlanId: plan2.id, componentId: 'comp-2', componentName: 'Second Component' };
-            await testPool.query('INSERT INTO test_plans (id, name, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)', [plan2.id, plan2.name, plan2.status, plan2.createdAt, plan2.updatedAt]);
-            await testPool.query('INSERT INTO plan_components (id, test_plan_id, component_id, component_name) VALUES ($1, $2, $3, $4)', [pc2.id, pc2.testPlanId, pc2.componentId, pc2.componentName]);
+            plan2 = { id: uuidv4(), name: 'Plan Two', planType: TestPlanType.COMPONENT, status: TestPlanStatus.COMPLETED, createdAt: new Date(), updatedAt: new Date() };
+            pc2 = { id: uuidv4(), testPlanId: plan2.id, sourceType: 'Boomi', componentId: 'comp-2', componentName: 'Second Component' };
+            await testPool.query('INSERT INTO test_plans (id, name, plan_type, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)', [plan2.id, plan2.name, plan2.planType, plan2.status, plan2.createdAt, plan2.updatedAt]);
+            await testPool.query('INSERT INTO plan_components (id, test_plan_id, source_type, component_id, component_name) VALUES ($1, $2, $3, $4, $5)', [pc2.id, pc2.testPlanId, pc2.sourceType, pc2.componentId, pc2.componentName]);
             
             await repository.save({ testPlanId: parentTestPlan.id, planComponentId: parentPlanComponent.id, testComponentId: 'test-abc-123', status: 'SUCCESS' });
             await repository.save({ testPlanId: parentTestPlan.id, planComponentId: parentPlanComponent.id, testComponentId: 'test-456', status: 'FAILURE' });

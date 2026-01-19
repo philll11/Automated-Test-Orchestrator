@@ -9,6 +9,7 @@ const mockResultRepo: jest.Mocked<ITestExecutionResultRepository> = {
     save: jest.fn(),
     findByPlanComponentIds: jest.fn(),
     findByFilters: jest.fn(),
+    deleteByTestPlanId: jest.fn(),
 };
 
 describe('TestExecutionResultService', () => {

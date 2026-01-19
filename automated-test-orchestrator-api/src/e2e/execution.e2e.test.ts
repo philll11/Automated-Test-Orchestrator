@@ -44,10 +44,10 @@ describe('Execution End-to-End Test (POST /api/v1/test-plans/:planId/execute)', 
         // --- Arrange (1): Seed the database ---
         const planId = uuidv4();
         // UPDATED: Added 'name' to test_plans insert
-        await testPool.query(`INSERT INTO test_plans (id, name, status, created_at, updated_at) VALUES ($1, 'E2E Success Plan', 'AWAITING_SELECTION', NOW(), NOW())`, [planId]);
+        await testPool.query(`INSERT INTO test_plans (id, name, status, plan_type, created_at, updated_at) VALUES ($1, 'E2E Success Plan', 'AWAITING_SELECTION', 'COMPONENT', NOW(), NOW())`, [planId]);
 
         const planComponentId = uuidv4();
-        await testPool.query(`INSERT INTO plan_components (id, test_plan_id, component_id, component_name) VALUES ($1, $2, 'comp-abc', 'Component to Test')`, [planComponentId, planId]);
+        await testPool.query(`INSERT INTO plan_components (id, test_plan_id, component_id, component_name, source_type) VALUES ($1, $2, 'comp-abc', 'Component to Test', 'DIRECT')`, [planComponentId, planId]);
 
         const testToRun = 'test-abc-123';
         // UPDATED: Added 'main_component_name' to mappings insert
@@ -83,9 +83,9 @@ describe('Execution End-to-End Test (POST /api/v1/test-plans/:planId/execute)', 
         // --- Arrange ---
         const planId = uuidv4();
         // UPDATED: Added 'name'
-        await testPool.query(`INSERT INTO test_plans (id, name, status, created_at, updated_at) VALUES ($1, 'E2E Failure Plan', 'AWAITING_SELECTION', NOW(), NOW())`, [planId]);
+        await testPool.query(`INSERT INTO test_plans (id, name, status, plan_type, created_at, updated_at) VALUES ($1, 'E2E Failure Plan', 'AWAITING_SELECTION', 'COMPONENT', NOW(), NOW())`, [planId]);
         const planComponentId = uuidv4();
-        await testPool.query(`INSERT INTO plan_components (id, test_plan_id, component_id) VALUES ($1, $2, 'comp-def')`, [planComponentId, planId]);
+        await testPool.query(`INSERT INTO plan_components (id, test_plan_id, component_id, source_type) VALUES ($1, $2, 'comp-def', 'DIRECT')`, [planComponentId, planId]);
         const testToRun = 'test-def-456';
         await testPool.query(`INSERT INTO mappings (id, main_component_id, test_component_id, created_at, updated_at) VALUES ($1, 'comp-def', $2, NOW(), NOW())`, [uuidv4(), testToRun]);
 

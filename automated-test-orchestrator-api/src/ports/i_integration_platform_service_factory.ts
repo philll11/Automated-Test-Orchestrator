@@ -13,5 +13,5 @@ export interface IIntegrationPlatformServiceFactory {
    * @param profileName The name of the credential profile to use for configuration.
    * @returns A promise that resolves with a fully configured IIntegrationPlatformService instance.
    */
-  create(profileName: string): Promise<IIntegrationPlatformService>;
+  createService(profileName: string): Promise<IIntegrationPlatformService>;
 }

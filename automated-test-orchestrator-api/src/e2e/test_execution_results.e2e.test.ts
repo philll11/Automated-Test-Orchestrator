@@ -28,12 +28,12 @@ describe('GET /api/v1/test-execution-results End-to-End Test', () => {
         await testPool.query('TRUNCATE TABLE test_plans, plan_components, mappings, test_execution_results RESTART IDENTITY CASCADE');
 
         // 1. Test Plans (without root_component_id)
-        await testPool.query(`INSERT INTO test_plans (id, status, created_at, updated_at) VALUES ($1, 'COMPLETED', NOW(), NOW()), ($2, 'COMPLETED', NOW(), NOW())`, [plan1Id, plan2Id]);
+        await testPool.query(`INSERT INTO test_plans (id, name, status, plan_type, created_at, updated_at) VALUES ($1, 'Results Plan 1', 'COMPLETED', 'COMPONENT', NOW(), NOW()), ($2, 'Results Plan 2', 'COMPLETED', 'COMPONENT', NOW(), NOW())`, [plan1Id, plan2Id]);
 
         // 2. Plan Components
-        await testPool.query(`INSERT INTO plan_components (id, test_plan_id, component_id, component_name) VALUES ($1, $2, 'comp-A', 'Component A')`, [pc1Id, plan1Id]);
-        await testPool.query(`INSERT INTO plan_components (id, test_plan_id, component_id, component_name) VALUES ($1, $2, 'comp-B', 'Component B')`, [pc2Id, plan1Id]);
-        await testPool.query(`INSERT INTO plan_components (id, test_plan_id, component_id, component_name) VALUES ($1, $2, 'comp-C', 'Component C')`, [pc3Id, plan2Id]);
+        await testPool.query(`INSERT INTO plan_components (id, test_plan_id, component_id, component_name, source_type) VALUES ($1, $2, 'comp-A', 'Component A', 'DIRECT')`, [pc1Id, plan1Id]);
+        await testPool.query(`INSERT INTO plan_components (id, test_plan_id, component_id, component_name, source_type) VALUES ($1, $2, 'comp-B', 'Component B', 'DIRECT')`, [pc2Id, plan1Id]);
+        await testPool.query(`INSERT INTO plan_components (id, test_plan_id, component_id, component_name, source_type) VALUES ($1, $2, 'comp-C', 'Component C', 'DIRECT')`, [pc3Id, plan2Id]);
 
         // 3. Mappings
         await testPool.query(`INSERT INTO mappings (id, main_component_id, test_component_id, test_component_name, created_at, updated_at) VALUES ($1, 'comp-A', 'test-A1', 'Test for A1', NOW(), NOW()), ($2, 'comp-C', 'test-C1', 'Test for C1', NOW(), NOW())`, [uuidv4(), uuidv4()]);

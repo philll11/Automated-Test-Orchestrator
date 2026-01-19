@@ -24,10 +24,10 @@ describe('GET /api/v1/test-plans End-to-End Test', () => {
 
         // UPDATED: The INSERT statement now includes the required 'name' column.
         await testPool.query(`
-            INSERT INTO test_plans (id, name, status, created_at, updated_at)
+            INSERT INTO test_plans (id, name, status, plan_type, created_at, updated_at)
             VALUES
-                ('${uuidv4()}', 'Completed E2E Plan', 'COMPLETED', NOW(), NOW()),
-                ('${uuidv4()}', 'Failed E2E Plan', 'DISCOVERY_FAILED', NOW(), NOW())
+                ('${uuidv4()}', 'Completed E2E Plan', 'COMPLETED', 'COMPONENT', NOW(), NOW()),
+                ('${uuidv4()}', 'Failed E2E Plan', 'DISCOVERY_FAILED', 'COMPONENT', NOW(), NOW())
         `);
     });
 

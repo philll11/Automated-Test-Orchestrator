@@ -1,5 +1,10 @@
 // src/domain/test_plan.ts
 
+export enum TestPlanType {
+    COMPONENT = 'COMPONENT',
+    TEST = 'TEST'
+}
+
 export enum TestPlanStatus {
     DISCOVERING = 'DISCOVERING',
     AWAITING_SELECTION = 'AWAITING_SELECTION',
@@ -12,6 +17,7 @@ export enum TestPlanStatus {
 export interface TestPlan {
   id: string;
   name: string;
+  planType: TestPlanType;
   status: TestPlanStatus;
   failureReason?: string;
   createdAt: Date;

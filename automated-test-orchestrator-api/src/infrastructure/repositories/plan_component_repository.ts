@@ -16,11 +16,11 @@ export class PlanComponentRepository implements IPlanComponentRepository {
         try {
             await client.query('BEGIN');
             for (const component of components) {
-                const { id, testPlanId, componentId, componentName, componentType } = component;
+                const { id, testPlanId, sourceType, componentId, componentName, componentType } = component;
                 const query = `
-                    INSERT INTO plan_components (id, test_plan_id, component_id, component_name, component_type)
-                    VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING;`;
-                const values = [id, testPlanId, componentId, componentName, componentType];
+                    INSERT INTO plan_components (id, test_plan_id, source_type, component_id, component_name, component_type)
+                    VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING;`;
+                const values = [id, testPlanId, sourceType, componentId, componentName, componentType];
                 await client.query(query, values);
             }
             await client.query('COMMIT');

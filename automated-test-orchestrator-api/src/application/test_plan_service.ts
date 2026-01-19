@@ -16,7 +16,7 @@ import { IIntegrationPlatformServiceFactory } from '../ports/i_integration_platf
 import { TestPlanEntryPoint } from '../domain/test_plan_entry_point.js';
 import { ITestPlanEntryPointRepository } from '../ports/i_test_plan_entry_point_repository.js';
 import { NotFoundError } from '../utils/app_error.js';
-import { TestPlan, TestPlanStatus } from '../domain/test_plan.js';
+import { TestPlan, TestPlanStatus, TestPlanType } from '../domain/test_plan.js';
 
 @injectable()
 export class TestPlanService implements ITestPlanService {
@@ -46,10 +46,11 @@ export class TestPlanService implements ITestPlanService {
         this.platformServiceFactory = platformServiceFactory;
     }
 
-    public async initiateDiscovery(name: string, componentIds: string[], credentialProfile: string, discoverDependencies: boolean): Promise<TestPlan> {
+    public async initiateDiscovery(name: string, planType: TestPlanType, componentIds: string[], credentialProfile: string, discoverDependencies: boolean): Promise<TestPlan> {
         const testPlan: TestPlan = {
             id: uuidv4(),
             name: name,
+            planType: planType,
             status: TestPlanStatus.DISCOVERING,
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -64,22 +65,65 @@ export class TestPlanService implements ITestPlanService {
         }));
         await this.testPlanEntryPointRepository.saveAll(entryPoints);
 
-        this.processPlanComponents(componentIds, savedTestPlan.id, credentialProfile, discoverDependencies)
-            .catch(async (error: Error) => {
-                console.error(`[TestPlanService] Processing failed for plan ${savedTestPlan.id}: ${error.message}`);
-                await this.testPlanRepository.update({
-                    ...savedTestPlan,
-                    status: TestPlanStatus.DISCOVERY_FAILED,
-                    failureReason: error.message,
-                    updatedAt: new Date(),
+        if (planType === TestPlanType.TEST) {
+             this.processTestModeComponents(componentIds, savedTestPlan.id, credentialProfile)
+                .catch(async (error: Error) => {
+                    console.error(`[TestPlanService] Processing failed for plan ${savedTestPlan.id}: ${error.message}`);
+                    await this.testPlanRepository.update({
+                        ...savedTestPlan,
+                        status: TestPlanStatus.DISCOVERY_FAILED,
+                        failureReason: error.message,
+                        updatedAt: new Date(),
+                    });
                 });
-            });
+        } else {
+             this.processPlanComponents(componentIds, savedTestPlan.id, credentialProfile, discoverDependencies)
+                .catch(async (error: Error) => {
+                    console.error(`[TestPlanService] Processing failed for plan ${savedTestPlan.id}: ${error.message}`);
+                    await this.testPlanRepository.update({
+                        ...savedTestPlan,
+                        status: TestPlanStatus.DISCOVERY_FAILED,
+                        failureReason: error.message,
+                        updatedAt: new Date(),
+                    });
+                });
+        }
 
         return savedTestPlan;
     }
 
+    private async processTestModeComponents(componentIds: string[], planId: string, credentialProfile: string): Promise<void> {
+        const platformService = await this.platformServiceFactory.createService(credentialProfile);
+        const planComponents: PlanComponent[] = [];
+        const limit = pLimit(5);
+
+        await Promise.all(componentIds.map(id => limit(async () => {
+             const info = await platformService.getComponentInfo(id);
+             if (!info) {
+                 throw new Error(`Component/Test ${id} not found on platform.`);
+             }
+             planComponents.push({
+                 id: uuidv4(),
+                 testPlanId: planId,
+                 sourceType: 'ARG',
+                 componentId: id,
+                 componentName: info.name,
+                 componentType: info.type
+             });
+        })));
+
+        await this.planComponentRepository.saveAll(planComponents);
+        
+        const plan = await this.testPlanRepository.findById(planId);
+        if (plan) {
+            plan.status = TestPlanStatus.AWAITING_SELECTION;
+            plan.updatedAt = new Date();
+            await this.testPlanRepository.update(plan);
+        }
+    }
+
     private async processPlanComponents(entryPointIds: string[], testPlanId: string, credentialProfile: string, discoverDependencies: boolean): Promise<void> {
-        const integrationPlatformService = await this.platformServiceFactory.create(credentialProfile);
+        const integrationPlatformService = await this.platformServiceFactory.createService(credentialProfile);
         const finalComponentsMap = new Map<string, ComponentInfo>();
 
         if (discoverDependencies) {
@@ -97,6 +141,7 @@ export class TestPlanService implements ITestPlanService {
         const planComponents: PlanComponent[] = Array.from(finalComponentsMap.values()).map(info => ({
             id: uuidv4(),
             testPlanId,
+            sourceType: 'DISCOVERED',
             componentId: info.id,
             componentName: info.name,
             componentType: info.type,
@@ -185,7 +230,7 @@ export class TestPlanService implements ITestPlanService {
         try {
             const limit = pLimit(this.config.concurrencyLimit);
 
-            const integrationPlatformService = await this.platformServiceFactory.create(credentialProfile);
+            const integrationPlatformService = await this.platformServiceFactory.createService(credentialProfile);
             const planComponents = await this.planComponentRepository.findByTestPlanId(planId);
             const allAvailableTestsMap = await this.mappingRepository.findAllTestsForMainComponents(planComponents.map(c => c.componentId));
 

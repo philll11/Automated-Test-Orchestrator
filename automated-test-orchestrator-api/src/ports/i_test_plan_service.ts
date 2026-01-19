@@ -1,6 +1,6 @@
 // src/ports/i_test_plan_service.ts
 
-import { TestPlan } from "../domain/test_plan.js";
+import { TestPlan, TestPlanType } from "../domain/test_plan.js";
 import { PlanComponent } from '../domain/plan_component.js';
 import { TestExecutionResult } from "../domain/test_execution_result.js";
 import { AvailableTestInfo } from "./i_mapping_repository.js";
@@ -31,12 +31,13 @@ export interface ITestPlanService {
   /**
    * Initiates the asynchronous creation of a new test plan.
    * @param name A descriptive name for the test plan.
+   * @param planType The mode of operation (COMPONENT or TEST).
    * @param componentIds An array of one or more component IDs to seed the plan.
    * @param credentialProfile The name of the credential profile to use for authentication.
    * @param discoverDependencies If true, recursively finds all dependencies.
    * @returns A new TestPlan in a 'DISCOVERING' state.
    */
-  initiateDiscovery(name: string, componentIds: string[], credentialProfile: string, discoverDependencies: boolean): Promise<TestPlan>;
+  initiateDiscovery(name: string, planType: TestPlanType, componentIds: string[], credentialProfile: string, discoverDependencies: boolean): Promise<TestPlan>;
 
   /**
    * Prepares a test plan for execution by validating its state, clearing previous results,

@@ -2,8 +2,8 @@
 
 import { Pool } from 'pg';
 import { v4 as uuidv4 } from 'uuid';
-import { TestPlanRepository } from './test_plan_repository';
-import { TestPlan } from '../../domain/test_plan';
+import { TestPlanRepository } from './test_plan_repository.js';
+import { TestPlan, TestPlanStatus, TestPlanType } from '../../domain/test_plan.js';
 
 describe('TestPlanRepository Integration Tests', () => {
     let repository: TestPlanRepository;
@@ -35,14 +35,16 @@ describe('TestPlanRepository Integration Tests', () => {
         seededPlan1 = {
             id: uuidv4(),
             name: 'Seeded Plan 1',
-            status: 'COMPLETED',
+            status: TestPlanStatus.COMPLETED,
+            planType: TestPlanType.COMPONENT,
             createdAt: new Date(Date.now() - 10000), // Older
             updatedAt: new Date(),
         };
         const seededPlan2: TestPlan = {
             id: uuidv4(),
             name: 'Seeded Plan 2',
-            status: 'DISCOVERING',
+            status: TestPlanStatus.DISCOVERING,
+            planType: TestPlanType.COMPONENT,
             createdAt: new Date(), // Newer
             updatedAt: new Date(),
         };
@@ -50,8 +52,8 @@ describe('TestPlanRepository Integration Tests', () => {
         // Insert in a specific order to test findAll ordering
         for (const plan of [seededPlan1, seededPlan2]) {
             await testPool.query(
-                'INSERT INTO test_plans (id, name, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)',
-                [plan.id, plan.name, plan.status, plan.createdAt, plan.updatedAt]
+                'INSERT INTO test_plans (id, name, plan_type, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)',
+                [plan.id, plan.name, plan.planType, plan.status, plan.createdAt, plan.updatedAt]
             );
         }
     });
@@ -65,7 +67,8 @@ describe('TestPlanRepository Integration Tests', () => {
             const newPlan: TestPlan = {
                 id: uuidv4(),
                 name: 'New Plan',
-                status: 'AWAITING_SELECTION',
+                planType: TestPlanType.TEST,
+                status: TestPlanStatus.AWAITING_SELECTION,
                 createdAt: new Date(),
                 updatedAt: new Date(),
             };
@@ -73,10 +76,12 @@ describe('TestPlanRepository Integration Tests', () => {
             const savedPlan = await repository.save(newPlan);
 
             expect(savedPlan.name).toBe('New Plan');
+            expect(savedPlan.planType).toBe(TestPlanType.TEST);
             
             const result = await testPool.query('SELECT * FROM test_plans WHERE id = $1', [newPlan.id]);
             expect(result.rowCount).toBe(1);
             expect(result.rows[0].name).toBe('New Plan');
+            expect(result.rows[0].plan_type).toBe('TEST');
         });
     });
 
@@ -96,11 +101,11 @@ describe('TestPlanRepository Integration Tests', () => {
 
     describe('update', () => {
         it('should update the status and failure_reason of a specific test plan', async () => {
-            const planToUpdate = { ...seededPlan1, status: 'EXECUTION_FAILED' as const, failureReason: 'A test failed' };
+            const planToUpdate = { ...seededPlan1, status: TestPlanStatus.EXECUTION_FAILED, failureReason: 'A test failed' };
             
             const updatedPlan = await repository.update(planToUpdate);
 
-            expect(updatedPlan.status).toBe('EXECUTION_FAILED');
+            expect(updatedPlan.status).toBe(TestPlanStatus.EXECUTION_FAILED);
             expect(updatedPlan.failureReason).toBe('A test failed');
 
             const result = await testPool.query('SELECT status, failure_reason FROM test_plans WHERE id = $1', [seededPlan1.id]);

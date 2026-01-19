@@ -4,6 +4,7 @@ import { Request, Response } from 'express';
 import { injectable, inject } from 'inversify';
 import { TYPES } from '../inversify.types.js';
 import { ITestPlanService } from '../ports/i_test_plan_service.js';
+import { TestPlanType } from '../domain/test_plan.js';
 import { BadRequestError, NotFoundError } from '../utils/app_error.js';
 
 /**
@@ -154,7 +155,11 @@ export class TestPlanController {
      *         description: Bad Request. Missing or invalid required fields.
      */
     public async initiateDiscovery(req: Request, res: Response): Promise<void> {
-        const { name, componentIds, credentialProfile, discoverDependencies } = req.body;
+        let { name, planType, componentIds, credentialProfile, discoverDependencies } = req.body;
+
+        if (!planType) {
+            planType = TestPlanType.COMPONENT;
+        }
 
         if (!name || typeof name !== 'string' || !credentialProfile || !Array.isArray(componentIds) || componentIds.length === 0) {
             throw new BadRequestError('A non-empty name, credentialProfile, and a non-empty componentIds array are required');
@@ -162,6 +167,7 @@ export class TestPlanController {
 
         const testPlan = await this.testPlanService.initiateDiscovery(
             name,
+            planType as TestPlanType,
             componentIds,
             credentialProfile,
             discoverDependencies ?? false // Default to false if undefined

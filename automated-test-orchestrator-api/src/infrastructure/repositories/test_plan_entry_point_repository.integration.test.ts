@@ -2,9 +2,9 @@
 
 import { Pool } from 'pg';
 import { v4 as uuidv4 } from 'uuid';
-import { TestPlanEntryPointRepository } from './test_plan_entry_point_repository';
-import { TestPlanEntryPoint } from '../../domain/test_plan_entry_point';
-import { TestPlan } from '../../domain/test_plan';
+import { TestPlanEntryPointRepository } from './test_plan_entry_point_repository.js';
+import { TestPlanEntryPoint } from '../../domain/test_plan_entry_point.js';
+import { TestPlan, TestPlanStatus, TestPlanType } from '../../domain/test_plan.js';
 
 describe('TestPlanEntryPointRepository Integration Tests', () => {
     let repository: TestPlanEntryPointRepository;
@@ -36,13 +36,14 @@ describe('TestPlanEntryPointRepository Integration Tests', () => {
         parentTestPlan = {
             id: uuidv4(),
             name: 'Parent Entry Point Plan',
-            status: 'DISCOVERING',
+            planType: TestPlanType.COMPONENT,
+            status: TestPlanStatus.DISCOVERING,
             createdAt: new Date(),
             updatedAt: new Date(),
         };
         await testPool.query(
-            'INSERT INTO test_plans (id, name, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)',
-            [parentTestPlan.id, parentTestPlan.name, parentTestPlan.status, parentTestPlan.createdAt, parentTestPlan.updatedAt]
+            'INSERT INTO test_plans (id, name, plan_type, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)',
+            [parentTestPlan.id, parentTestPlan.name, parentTestPlan.planType, parentTestPlan.status, parentTestPlan.createdAt, parentTestPlan.updatedAt]
         );
     });
 

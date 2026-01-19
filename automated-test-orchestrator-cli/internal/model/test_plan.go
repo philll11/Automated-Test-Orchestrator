@@ -53,6 +53,7 @@ type CliTestPlanSummary struct {
 // InitiateDiscoveryRequest is the structure for the POST /test-plans request body.
 type InitiateDiscoveryRequest struct {
 	Name                 string   `json:"name"`
+	PlanType             string   `json:"planType"`
 	ComponentIDs         []string `json:"componentIds"`
 	CredentialProfile    string   `json:"credentialProfile"`
 	DiscoverDependencies bool     `json:"discoverDependencies"`

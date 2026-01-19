@@ -1,7 +1,7 @@
 import nock from 'nock';
-import { BoomiService } from './boomi_service';
-import { IntegrationPlatformCredentials } from '../../domain/integration_platform_credentials';
-import { IPlatformConfig } from '../config'; // Import the config interface
+import { BoomiService } from './boomi_service.js';
+import { IntegrationPlatformCredentials } from '../../domain/integration_platform_credentials.js';
+import { IPlatformConfig } from '../config.js'; // Import the config interface
 
 // --- MOCK CREDENTIALS ---
 const testCredentials: IntegrationPlatformCredentials = {
